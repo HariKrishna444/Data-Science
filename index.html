@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RetroNexus: Advanced Snake Engine</title>
+    <style>
+        /* ==========================================================================
+           1. CSS VARIABLES & THEMES
+           ========================================================================== */
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            --panel-bg: rgba(255, 255, 255, 0.06);
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #ffffff;
+            --text-secondary: #b0bec5;
+            --accent-neon: #00ffcc;
+            --accent-warm: #ff4081;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --shadow-glow: 0 0 15px rgba(0, 255, 204, 0.4);
+            --card-radius: 16px;
+        }
+
+        [data-theme="cyberpunk"] {
+            --bg-gradient: linear-gradient(135deg, #001f3f, #001220);
+            --panel-bg: rgba(0, 255, 255, 0.03);
+            --panel-border: rgba(0, 255, 255, 0.2);
+            --accent-neon: #f0f;
+            --shadow-glow: 0 0 15px rgba(255, 0, 255, 0.5);
+        }
+
+        [data-theme="sunset"] {
+            --bg-gradient: linear-gradient(135deg, #41295a, #2f0743);
+            --panel-bg: rgba(255, 255, 255, 0.04);
+            --panel-border: rgba(255, 100, 100, 0.2);
+            --accent-neon: #ff9900;
+            --shadow-glow: 0 0 15px rgba(255, 153, 0, 0.5);
+        }
+
+        /* ==========================================================================
+           2. GLOBAL RESET & BASE STYLES
+           ========================================================================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            perspective: 1000px;
+        }
+
+        /* ==========================================================================
+           3. APPLICATION LAYOUT
+           ========================================================================== */
+        #app-container {
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+            gap: 24px;
+            width: 95vw;
+            max-width: 1400px;
+            height: 85vh;
+            max-height: 900px;
+        }
+
+        @media (max-width: 1100px) {
+            #app-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+                height: auto;
+                max-height: none;
+                overflow-y: auto;
+                padding: 20px 0;
+            }
+        }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--card-radius);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .glass-panel:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* ==========================================================================
+           4. LEFT PANEL: CONTROLS & CONFIGURATION
+           ========================================================================== */
+        .sidebar-left h1 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            background: linear-gradient(45deg, #fff, var(--accent-neon));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .config-group {
+            margin-bottom: 20px;
+        }
+
+        .config-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+
+        .custom-select, .custom-btn {
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .custom-select:focus, .custom-btn:hover {
+            border-color: var(--accent-neon);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .custom-btn {
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .custom-btn.primary {
+            background: linear-gradient(135deg, var(--accent-neon), #00b3ff);
+            color: #000;
+            font-weight: 700;
+        }
+
+        .custom-btn.danger {
+            background: linear-gradient(135deg, var(--accent-warm), #ff0055);
+        }
+
+        /* ==========================================================================
+           5. CENTER PANEL: THE ARENA
+           ========================================================================== */
+        .arena-container {
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stats-ribbon {
+            display: flex;
+            width: 100%;
+            justify-content: space-around;
+            background: rgba(0,0,0,0.4);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .stat-box {
+            text-align: center;
+        }
+
+        .stat-box .label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .stat-box .value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-neon);
+        }
+
+        #canvas-wrapper {
+            position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.6);
+            border-radius: 8px;
+            overflow: hidden;
+            background: #050b14;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* Screen overlays (Pause, Game Over) */
+        .screen-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 11, 20, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 10;
+        }
+
+        .screen-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .screen-overlay h2 {
+            font-size: 2.5rem;
+            color: var(--accent-warm);
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px rgba(255,64,129,0.5);
+        }
+
+        /* ==========================================================================
+           6. RIGHT PANEL: METRICS, UPGRADES & SHOP
+           ========================================================================== */
+        .tabs-header {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 8px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .tab-btn.active {
+            color: var(--accent-neon);
+            border-bottom: 2px solid var(--accent-neon);
+        }
+
+        .tab-content {
+            display: none;
+            flex-block: 1;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Customize Scrollbars */
+        .tab-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        .tab-content::-webkit-scrollbar-thumb {
+            background: var(--panel-border);
+            border-radius: 2px;
+        }
+
+        /* Shop Elements */
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid transparent;
+        }
+
+        .shop-item.equipped {
+            border-color: var(--accent-neon);
+        }
+
+        .shop-item-info-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .shop-item-info-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Achievements Elements */
+        .achievement-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255,255,255,0.03);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            opacity: 0.5;
+        }
+
+        .achievement-row.unlocked {
+            opacity: 1;
+            border-left: 3px solid var(--accent-neon);
+        }
+
+        .achievement-icon {
+            font-size: 1.5rem;
+        }
+
+        /* Keyboard Helper Map */
+        .keyboard-map {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            width: 120px;
+            margin: 15px auto;
+        }
+        .key-cap {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid var(--panel-border);
+            border-radius: 4px;
+            text-align: center;
+            padding: 5px;
+            font-size: 0.75rem;
+        }
+
+        /* Notification Toast */
+        #toast-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid var(--accent-neon);
+            box-shadow: var(--shadow-glow);
+            padding: 12px 24px;
+            border-radius: 8px;
+            transform: translateY(150%);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 100;
+        }
+        #toast-notification.show {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        
+        <!-- ==========================================================================
+             LEFT CONTROLS PANEL
+             ========================================================================== -->
+        <aside class="glass-panel sidebar-left">
+            <h1>RetroNexus</h1>
+            
+            <div class="config-group">
+                <label>Game Setup Mode</label>
+                <select id="select-mode" class="custom-select">
+                    <option value="classic">Classic Mode</option>
+                    <option value="obstacles">Obstacle Maze</option>
+                    <option value="speedrun">Speed Warp Time</option>
+                    <option value="portal">Quantum Portals</option>
+                </select>
+            </div>
+
+            <div class="config-group">
+                <label>Game Speed Velocity</label>
+                <select id="select-speed" class="custom-select">
+                    <option value="120">Apprentice (Slow)</option>
+                    <option value="80" selected>Technician (Normal)</option>
+                    <option value="50">Cyber-Elite (Fast)</option>
+                    <option value="30">God-Speed (Extreme)</option>
+                </select>
+            </div>
+
+            <div class="config-group">
+                <label>Grid Matrix Size</label>
+                <select id="select-grid" class="custom-select">
+                    <option value="15">Compact (15x15)</option>
+                    <option value="20" selected>Standard (20x20)</option>
+                    <option value="30">Colossal (30x30)</option>
+                </select>
+            </div>
+
+            <div class="config-group">
+                <label>Visual UI Theme</label>
+                <select id="select-theme" class="custom-select">
+                    <option value="default">Matrix Deep Teal</option>
+                    <option value="cyberpunk">Cyber Neon Pink</option>
+                    <option value="sunset">Sol Resonance Sunset</option>
+                </select>
+            </div>
+
+            <div style="margin-top: auto;">
+                <button id="btn-start" class="custom-btn primary">Initialize System</button>
+                <button id="btn-pause" class="custom-btn" disabled>Pause Cycle</button>
+                <button id="btn-ai" class="custom-btn">Toggle Neuromorphic AI</button>
+            </div>
+        </aside>
+
+        <!-- ==========================================================================
+             CENTER STAGE (ARENA)
+             ========================================================================== -->
+        <main class="glass-panel arena-container">
+            <div class="stats-ribbon">
+                <div class="stat-box">
+                    <div class="label">Current Pulse</div>
+                    <div id="val-score" class="value">0000</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Highest Peak</div>
+                    <div id="val-high" class="value">0000</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Omni-Coins</div>
+                    <div id="val-coins" class="value">0000</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Multiplier</div>
+                    <div id="val-multiplier" class="value">1.0x</div>
+                </div>
+            </div>
+
+            <div id="canvas-wrapper">
+                <canvas id="game-canvas" width="500" height="500"></canvas>
+                
+                <!-- Overlay Canvas Menus -->
+                <div id="overlay-start" class="screen-overlay active">
+                    <h2 style="color: var(--accent-neon);">SYSTEM READY</h2>
+                    <p style="color: var(--text-secondary); text-align:center; margin-bottom: 20px; max-width: 80%;">
+                        Calibrate configuration nodes then hit initialize system.
+                    </p>
+                    <div class="keyboard-map">
+                        <div></div><div class="key-cap">W</div><div></div>
+                        <div class="key-cap">A</div><div class="key-cap">S</div><div class="key-cap">D</div>
+                    </div>
+                </div>
+
+                <div id="overlay-pause" class="screen-overlay">
+                    <h2 style="color: #fff;">CYCLE PAUSED</h2>
+                    <p style="color: var(--text-secondary);">System operations suspended</p>
+                </div>
+
+                <div id="overlay-gameover" class="screen-overlay">
+                    <h2>SYSTEM CRASH</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 10px;">Core Dump: Snake Fragmented</p>
+                    <p style="font-size: 1.1rem; margin-bottom:20px;">Score Achieved: <span id="over-score" style="color:var(--accent-neon); font-weight:700;">0</span></p>
+                    <button id="btn-restart" class="custom-btn primary" style="width: auto; padding: 12px 30px;">Re-Boot Loop</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- ==========================================================================
+             RIGHT CONSOLE: ECO-SYSTEM / SHOP
+             ========================================================================== -->
+        <aside class="glass-panel sidebar-right">
+            <div class="tabs-header">
+                <button class="tab-btn active" data-target="tab-shop">Nanite Skins</button>
+                <button class="tab-btn" data-target="tab-achieve">Data Vault</button>
+                <button class="tab-btn" data-target="tab-stats">Telemetry</button>
+            </div>
+
+            <!-- Tab: Shop -->
+            <div id="tab-shop" class="tab-content active">
+                <div style="font-size:0.8rem; color: var(--text-secondary); margin-bottom:12px;">Acquire skin matrices using earned Omni-coins:</div>
+                <div id="shop-container" style="flex:1; overflow-y:auto;">
+                    <!-- Injected dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- Tab: Achievements -->
+            <div id="tab-achieve" class="tab-content">
+                <div id="achieve-container" style="flex:1; overflow-y:auto;">
+                    <!-- Injected dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- Tab: Telemetry Stats -->
+            <div id="tab-stats" class="tab-content">
+                <div style="display:flex; flex-direction:column; gap:10px; font-size:0.9rem;">
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px;">
+                        <span>Total Cells Eaten:</span><span id="tel-eaten" style="color:var(--accent-neon)">0</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px;">
+                        <span>Time Quantums Locked:</span><span id="tel-time" style="color:var(--accent-neon)">0s</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px;">
+                        <span>AI Simulation Runs:</span><span id="tel-ai" style="color:var(--accent-neon)">0</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px;">
+                        <span>Portals Cycled:</span><span id="tel-portals" style="color:var(--accent-neon)">0</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- Notification Engine Component Overlay -->
+    <div id="toast-notification">
+        <span id="toast-text" style="font-weight: 600; color: #fff;">Node Synced!</span>
+    </div>
+
+    <!-- ==========================================================================
+         7. ARCHITECTURAL JAVASCRIPT CORE
+         ========================================================================== -->
+    <script>
+        (function() {
+            'use strict';
+
+            /* ==========================================================================
+               A. CORE CONFIGURATION, STATE & STORAGE MANAGEMENT
+               ========================================================================== */
+            const CONFIG = {
+                canvasSize: 500,
+                storageKeys: {
+                    highScore: 'snake_engine_high',
+                    coins: 'snake_engine_coins',
+                    skins: 'snake_engine_skins',
+                    equippedSkin: 'snake_engine_eqskin',
+                    telemetry: 'snake_engine_telemetry'
+                }
+            };
+
+            let state = {
+                gameLoopId: null,
+                isSpawned: false,
+                isPaused: false,
+                isGameOver: false,
+                score: 0,
+                highScore: 0,
+                coins: 0,
+                multiplier: 1.0,
+                gridSize: 20,
+                cellSize: 25,
+                gameSpeed: 80,
+                gameMode: 'classic', // classic, obstacles, speedrun, portal
+                aiModeActive: false,
+                
+                // Entity Vectors
+                snake: [],
+                direction: { x: 1, y: 0 },
+                nextDirection: { x: 1, y: 0 },
+                food: { x: 0, y: 0, type: 'standard' }, // standard, golden, toxic, quantum
+                obstacles: [],
+                portals: [], // {in: Vector, out: Vector}
+                
+                // Sub-Engine instances
+                particles: [],
+                tailGlowPulse: 0,
+                telemetry: {
+                    totalEaten: 0,
+                    startTime: 0,
+                    elapsedTime: 0,
+                    aiRuns: 0,
+                    portalsTraversed: 0
+                },
+                equippedSkin: 'neon-classic'
+            };
+
+            // Definitions Database
+            const FOOD_TYPES = {
+                standard: { color: '#00ffcc', scoreValue: 10, coinValue: 1, weight: 0.7, label: 'Standard Data Node' },
+                golden: { color: '#ffcc00', scoreValue: 30, coinValue: 5, weight: 0.15, label: 'Hyperion core' },
+                toxic: { color: '#ff4081', scoreValue: -5, coinValue: 0, weight: 0.1, label: 'Corrupted Vector' },
+                quantum: { color: '#9933ff', scoreValue: 15, coinValue: 2, weight: 0.05, label: 'Quantum Anomaly' }
+            };
+
+            const SKIN_CATALOGUE = [
+                { id: 'neon-classic', name: 'Cyber Neon Grid', cost: 0, render: 'gradient', color1: '#00ffcc', color2: '#00b3ff', desc: 'Standard issue synthetic light framework.' },
+                { id: 'solar-flare', name: 'Helios Magma', cost: 50, render: 'plasma', color1: '#ff9900', color2: '#ff0055', desc: 'Superheated structural containment aura.' },
+                { id: 'deep-void', name: 'Singularity Core', cost: 150, render: 'void', color1: '#7000ff', color2: '#000000', desc: 'Gravitational containment field geometry.' },
+                { id: 'matrix-glitch', name: 'Digital Ghost', cost: 300, render: 'glitch', color1: '#33ff33', color2: '#004400', desc: 'Decompiled operational logic wrapper.' }
+            ];
+
+            const ACHIEVEMENT_REGISTRY = [
+                { id: 'first_byte', title: 'First Byte', desc: 'Consume your initial active data node.', check: () => state.telemetry.totalEaten >= 1, unlocked: false, icon: '💾' },
+                { id: 'century', title: 'Centurion Protocol', desc: 'Attain a total operational length score of 100.', check: () => state.score >= 100, unlocked: false, icon: '💯' },
+                { id: 'wealthy', title: 'Silicon Tycoon', desc: 'Amass over 100 Omni-Coins in local storage storage.', check: () => state.coins >= 100, unlocked: false, icon: '🪙' },
+                { id: 'ai_symbiosis', title: 'Cybernetic Symbiosis', desc: 'Let the Neuromorphic AI auto-pilot score 50 points.', check: () => state.aiModeActive && state.score >= 50, unlocked: false, icon: '🤖' },
+                { id: 'dimensional_travel', title: 'Fold Space-Time', desc: 'Traverse 10 operational quantum portals.', check: () => state.telemetry.portalsTraversed >= 10, unlocked: false, icon: '🌀' }
+            ];
+
+            /* ==========================================================================
+               B. AUDIO SYNTHESIZER ENGINE (Web Audio API - No External Files Required)
+               ========================================================================== */
+            const SoundEngine = {
+                ctx: null,
+                init() {
+                    if (!this.ctx) {
+                        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                },
+                play(type) {
+                    if (!this.ctx) return;
+                    // Auto resume context if suspended by browser security
+                    if (this.ctx.state === 'suspended') {
+                        this.ctx.resume();
+                    }
+
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    switch (type) {
+                        case 'eat':
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(300, now);
+                            osc.frequency.exponentialRampToValueAtTime(800, now + 0.12);
+                            gain.gain.setValueAtTime(0.15, now);
+                            gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+                            osc.start(now);
+                            osc.stop(now + 0.12);
+                            break;
+                        case 'eat-gold':
+                            osc.type = 'triangle';
+                            osc.frequency.setValueAtTime(440, now);
+                            osc.frequency.exponentialRampToValueAtTime(1200, now + 0.2);
+                            gain.gain.setValueAtTime(0.2, now);
+                            gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                            osc.start(now);
+                            osc.stop(now + 0.2);
+                            break;
+                        case 'crash':
+                            osc.type = 'sawtooth';
+                            osc.frequency.setValueAtTime(180, now);
+                            osc.frequency.linearRampToValueAtTime(40, now + 0.4);
+                            gain.gain.setValueAtTime(0.3, now);
+                            gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+                            osc.start(now);
+                            osc.stop(now + 0.4);
+                            break;
+                        case 'portal':
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(600, now);
+                            osc.frequency.linearRampToValueAtTime(300, now + 0.15);
+                            osc.frequency.exponentialRampToValueAtTime(900, now + 0.3);
+                            gain.gain.setValueAtTime(0.1, now);
+                            gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                            osc.start(now);
+                            osc.stop(now + 0.3);
+                            break;
+                        case 'ui':
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(600, now);
+                            gain.gain.setValueAtTime(0.05, now);
+                            gain.gain.linearRampToValueAtTime(0.001, now + 0.05);
+                            osc.start(now);
+                            osc.stop(now + 0.05);
+                            break;
+                    }
+                }
+            };
+
+            /* ==========================================================================
+               C. DOM ELEMENTS & SELECTORS SETUP
+               ========================================================================== */
+            const DOM = {
+                canvas: document.getElementById('game-canvas'),
+                ctx: document.getElementById('game-canvas').getContext('2d'),
+                selectMode: document.getElementById('select-mode'),
+                selectSpeed: document.getElementById('select-speed'),
+                selectGrid: document.getElementById('select-grid'),
+                selectTheme: document.getElementById('select-theme'),
+                btnStart: document.getElementById('btn-start'),
+                btnPause: document.getElementById('btn-pause'),
+                btnAI: document.getElementById('btn-ai'),
+                btnRestart: document.getElementById('btn-restart'),
+                score: document.getElementById('val-score'),
+                highScore: document.getElementById('val-high'),
+                coins: document.getElementById('val-coins'),
+                multiplier: document.getElementById('val-multiplier'),
+                overlayStart: document.getElementById('overlay-start'),
+                overlayPause: document.getElementById('overlay-pause'),
+                overlayGameover: document.getElementById('overlay-gameover'),
+                overScore: document.getElementById('over-score'),
+                tabBtns: document.querySelectorAll('.tab-btn'),
+                tabContents: document.querySelectorAll('.tab-content'),
+                shopContainer: document.getElementById('shop-container'),
+                achieveContainer: document.getElementById('achieve-container'),
+                telEaten: document.getElementById('tel-eaten'),
+                telTime: document.getElementById('tel-time'),
+                telAI: document.getElementById('tel-ai'),
+                telPortals: document.getElementById('tel-portals'),
+                toast: document.getElementById('toast-notification'),
+                toastText: document.getElementById('toast-text')
+            };
+
+            /* ==========================================================================
+               D. PARTICLE SYSTEM ENGINE
+               ========================================================================== */
+            class Particle {
+                constructor(x, y, color) {
+                    this.x = x;
+                    this.y = y;
+                    this.color = color;
+                    this.vx = (Math.random() - 0.5) * 6;
+                    this.vy = (Math.random() - 0.5) * 6;
+                    this.radius = Math.random() * 3 + 1;
+                    this.alpha = 1;
+                    this.decay = Math.random() * 0.03 + 0.015;
+                }
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.alpha -= this.decay;
+                }
+                draw(ctx) {
+                    ctx.save();
+                    ctx.globalAlpha = this.alpha;
+                    ctx.fillStyle = this.color;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = this.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            function emitExplosion(gridX, gridY, color) {
+                const pixelX = gridX * state.cellSize + state.cellSize / 2;
+                const pixelY = gridY * state.cellSize + state.cellSize / 2;
+                for (let i = 0; i < 20; i++) {
+                    state.particles.push(new Particle(pixelX, pixelY, color));
+                }
+            }
+
+            function updateAndRenderParticles() {
+                for (let i = state.particles.length - 1; i >= 0; i--) {
+                    let p = state.particles[i];
+                    p.update();
+                    if (p.alpha <= 0) {
+                        state.particles.splice(i, 1);
+                    } else {
+                        p.draw(DOM.ctx);
+                    }
+                }
+            }
+
+            /* ==========================================================================
+               E. PROCEDURAL WORLD GENERATION AND SPAWNING LOGIC
+               ========================================================================== */
+            function initEngineVariables() {
+                state.gridSize = parseInt(DOM.selectGrid.value, 10);
+                state.cellSize = CONFIG.canvasSize / state.gridSize;
+                state.gameSpeed = parseInt(DOM.selectSpeed.value, 10);
+                state.gameMode = DOM.selectMode.value;
+                
+                // Construct Snake Coordinates in Core Array
+                const mid = Math.floor(state.gridSize / 2);
+                state.snake = [
+                    { x: mid, y: mid },
+                    { x: mid - 1, y: mid },
+                    { x: mid - 2, y: mid }
+                ];
+                
+                state.direction = { x: 1, y: 0 };
+                state.nextDirection = { x: 1, y: 0 };
+                state.score = 0;
+                state.multiplier = 1.0;
+                state.isGameOver = false;
+                state.isPaused = false;
+                state.particles = [];
+                state.obstacles = [];
+                state.portals = [];
+                
+                // Construct Obstacles map based on system parameters chosen
+                if (state.gameMode === 'obstacles') {
+                    generateObstacleGrid();
+                } else if (state.gameMode === 'portal') {
+                    generateQuantumPortals();
+                }
+
+                spawnFoodEntity();
+                syncDOMCounters();
+            }
+
+            function generateObstacleGrid() {
+                // Generate layout constraints (Static structures inside arena boundaries)
+                const margin = Math.floor(state.gridSize * 0.2);
+                const limit = state.gridSize - margin;
+                
+                // Center Cross Block layout
+                for (let i = margin + 2; i < limit - 2; i++) {
+                    state.obstacles.push({ x: i, y: Math.floor(state.gridSize / 3) });
+                    state.obstacles.push({ x: Math.floor((state.gridSize / 3) * 2), y: i });
+                }
+            }
+
+            function generateQuantumPortals() {
+                const pad = 3;
+                const maxCoord = state.gridSize - 1;
+                
+                // Portal Orange Pair
+                state.portals.push({
+                    in: { x: pad, y: pad },
+                    out: { x: maxCoord - pad, y: maxCoord - pad },
+                    color: '#ff9900'
+                });
+                // Portal Blue Pair
+                state.portals.push({
+                    in: { x: maxCoord - pad, y: pad },
+                    out: { x: pad, y: maxCoord - pad },
+                    color: '#00b3ff'
+                });
+            }
+
+            function spawnFoodEntity() {
+                let validSpawn = false;
+                let potentialVector = { x: 0, y: 0 };
+
+                while (!validSpawn) {
+                    potentialVector.x = Math.floor(Math.random() * state.gridSize);
+                    potentialVector.y = Math.floor(Math.random() * state.gridSize);
+                    
+                    // Collision validation passes
+                    let onSnake = state.snake.some(segment => segment.x === potentialVector.x && segment.y === potentialVector.y);
+                    let onObstacle = state.obstacles.some(obs => obs.x === potentialVector.x && obs.y === potentialVector.y);
+                    let onPortal = state.portals.some(p => (p.in.x === potentialVector.x && p.in.y === potentialVector.y) || (p.out.x === potentialVector.x && p.out.y === potentialVector.y));
+
+                    if (!onSnake && !onObstacle && !onPortal) {
+                        validSpawn = true;
+                    }
+                }
+
+                // Determine dynamic food mutation classification node via relative weights
+                const rand = Math.random();
+                let chosenType = 'standard';
+                let cumulativeWeight = 0;
+
+                for (const [type, data] of Object.entries(FOOD_TYPES)) {
+                    cumulativeWeight += data.weight;
+                    if (rand <= cumulativeWeight) {
+                        chosenType = type;
+                        break;
+                    }
+                }
+
+                state.food = {
+                    x: potentialVector.x,
+                    y: potentialVector.y,
+                    type: chosenType
+                };
+            }
+
+            /* ==========================================================================
+               F. NEUROMORPHIC PATHFINDING AUTOMATION (AI BOT ENGINE)
+               ========================================================================== */
+            function executeAILogicEngine() {
+                const head = state.snake[0];
+                const target = state.food;
+
+                // Simple high-speed structural path calculations minimizing Manhattan delta vector distances
+                const directions = [
+                    { x: 1, y: 0, name: 'RIGHT' },
+                    { x: -1, y: 0, name: 'LEFT' },
+                    { x: 0, y: 1, name: 'DOWN' },
+                    { x: 0, y: -1, name: 'UP' }
+                ];
+
+                let optimizedMove = null;
+                let minimumDistance = Infinity;
+
+                for (let dir of directions) {
+                    // Filter out 180-degree blind snapping reversals
+                    if (dir.x === -state.direction.x && dir.y === -state.direction.y) continue;
+
+                    const nextX = head.x + dir.x;
+                    const nextY = head.y + dir.y;
+
+                    // Bound checks wrap simulation projection variables
+                    let simulatedX = nextX;
+                    let simulatedY = nextY;
+                    if (state.gameMode !== 'obstacles') {
+                        if (simulatedX < 0) simulatedX = state.gridSize - 1;
+                        if (simulatedX >= state.gridSize) simulatedX = 0;
+                        if (simulatedY < 0) simulatedY = state.gridSize - 1;
+                        if (simulatedY >= state.gridSize) simulatedY = 0;
+                    }
+
+                    // Check if simulation step results in critical structure destruction matrix collisions
+                    let collidesSnake = state.snake.some((seg, idx) => idx !== state.snake.length-1 && seg.x === simulatedX && seg.y === simulatedY);
+                    let collidesObstacle = state.obstacles.some(obs => obs.x === simulatedX && obs.y === simulatedY);
+                    let collidesWall = state.gameMode === 'obstacles' && (nextX < 0 || nextX >= state.gridSize || nextY < 0 || nextY >= state.gridSize);
+
+                    if (collidesSnake || collidesObstacle || collidesWall) continue;
+
+                    // Evaluation score metric via mathematical coordinates
+                    let dist = Math.abs(simulatedX - target.x) + Math.abs(simulatedY - target.y);
+                    if (dist < minimumDistance) {
+                        minimumDistance = dist;
+                        optimizedMove = dir;
+                    }
+                }
+
+                // Inject direction array mutations to application stream state
+                if (optimizedMove) {
+                    state.nextDirection = { x: optimizedMove.x, y: optimizedMove.y };
+                }
+            }
+
+            /* ==========================================================================
+               G. TICK STATE MUTATION & DISPATCH LOOP LOGIC
+               ========================================================================== */
+            function processGameTick() {
+                if (state.isPaused || state.isGameOver) return;
+
+                // If Auto AI processing module interface node is engaged
+                if (state.aiModeActive) {
+                    executeAILogicEngine();
+                }
+
+                state.direction = { ...state.nextDirection };
+                
+                // Mathematical translation of physical coordinates system array variables
+                const currentHead = state.snake[0];
+                let targetHeadCoordinate = {
+                    x: currentHead.x + state.direction.x,
+                    y: currentHead.y + state.direction.y
+                };
+
+                // Mode Handling: Screen Boundaries Rules Setup
+                if (state.gameMode === 'obstacles') {
+                    if (targetHeadCoordinate.x < 0 || targetHeadCoordinate.x >= state.gridSize || 
+                        targetHeadCoordinate.y < 0 || targetHeadCoordinate.y >= state.gridSize) {
+                        triggerSystemCrash();
+                        return;
+                    }
+                } else {
+                    // Classical wrap matrix computation transformations
+                    if (targetHeadCoordinate.x < 0) targetHeadCoordinate.x = state.gridSize - 1;
+                    if (targetHeadCoordinate.x >= state.gridSize) targetHeadCoordinate.x = 0;
+                    if (targetHeadCoordinate.y < 0) targetHeadCoordinate.y = state.gridSize - 1;
+                    if (targetHeadCoordinate.y >= state.gridSize) targetHeadCoordinate.y = 0;
+                }
+
+                // Check collision variables against inside entity blocks array loop
+                if (state.obstacles.some(obs => obs.x === targetHeadCoordinate.x && obs.y === targetHeadCoordinate.y)) {
+                    triggerSystemCrash();
+                    return;
+                }
+
+                // Self body segment collision exception tracking exclusions
+                if (state.snake.some((seg, index) => index !== 0 && seg.x === targetHeadCoordinate.x && seg.y === targetHeadCoordinate.y)) {
+                    triggerSystemCrash();
+                    return;
+                }
+
+                // Portal System mechanics logic evaluations
+                if (state.gameMode === 'portal') {
+                    for (let pair of state.portals) {
+                        if (targetHeadCoordinate.x === pair.in.x && targetHeadCoordinate.y === pair.in.y) {
+                            targetHeadCoordinate = { ...pair.out };
+                            state.telemetry.portalsTraversed++;
+                            SoundEngine.play('portal');
+                            emitExplosion(pair.out.x, pair.out.y, pair.color);
+                            break;
+                        } else if (targetHeadCoordinate.x === pair.out.x && targetHeadCoordinate.y === pair.out.y) {
+                            targetHeadCoordinate = { ...pair.in };
+                            state.telemetry.portalsTraversed++;
+                            SoundEngine.play('portal');
+                            emitExplosion(pair.in.x, pair.in.y, pair.color);
+                            break;
+                        }
+                    }
+                }
+
+                // Advance front spatial index mapping array element positioning
+                state.snake.unshift(targetHeadCoordinate);
+
+                // Collision evaluation logic structure on standard target nodes
+                if (targetHeadCoordinate.x === state.food.x && targetHeadCoordinate.y === state.food.y) {
+                    processNodeConsumption();
+                } else {
+                    state.snake.pop();
+                }
+
+                // Handle system tick operations updating frame arrays
+                clearRenderingCanvas();
+                drawWorldGridEntities();
+                updateAndRenderParticles();
+                processSystemTelemetryCounters();
+                evaluateAchievementsMatrix();
+
+                // Re-queue subsequent system loop intervals iteration sequence 
+                state.gameLoopId = setTimeout(processGameTick, state.gameSpeed);
+            }
+
+            function processNodeConsumption() {
+                const foodSpec = FOOD_TYPES[state.food.type];
+                
+                // Sound Synthesizer Call
+                SoundEngine.play(state.food.type === 'golden' ? 'eat-gold' : 'eat');
+
+                // Visual Blast Effect Injections
+                emitExplosion(state.food.x, state.food.y, foodSpec.color);
+
+                // Score Variable Adjustments
+                const pointsCalculated = Math.round(foodSpec.scoreValue * state.multiplier);
+                state.score = Math.max(0, state.score + pointsCalculated);
+                state.coins += foodSpec.coinValue;
+                state.telemetry.totalEaten++;
+
+                // Process Multiplier Mechanics
+                if (state.food.type === 'golden') {
+                    state.multiplier += 0.5;
+                } else if (state.food.type === 'toxic') {
+                    state.multiplier = Math.max(1.0, state.multiplier - 0.2);
+                    // Penalize structural components: pop tail section
+                    if (state.snake.length > 2) state.snake.pop();
+                } else {
+                    state.multiplier += 0.05;
+                }
+
+                if (state.score > state.highScore) {
+                    state.highScore = state.score;
+                    localStorage.setItem(CONFIG.storageKeys.highScore, state.highScore);
+                }
+
+                // Write modified parameters back to persistent storage layers
+                localStorage.setItem(CONFIG.storageKeys.coins, state.coins);
+                
+                // Mutation of velocity parameters in dynamic SpeedRun Mode frames
+                if (state.gameMode === 'speedrun') {
+                    state.gameSpeed = Math.max(20, state.gameSpeed - 2);
+                }
+
+                syncDOMCounters();
+                spawnFoodEntity();
+            }
+
+            function triggerSystemCrash() {
+                state.isGameOver = true;
+                clearTimeout(state.gameLoopId);
+                SoundEngine.play('crash');
+                
+                // Particle Burst
+                if (state.snake.length > 0) {
+                    emitExplosion(state.snake[0].x, state.snake[0].y, '#ff4081');
+                }
+
+                DOM.overScore.innerText = state.score;
+                DOM.overlayGameover.classList.add('active');
+                DOM.btnPause.disabled = true;
+
+                saveTelemetryData();
+            }
+
+            /* ==========================================================================
+               H. HIGH-PERFORMANCE 2D RENDERING CANVAS GRAPHICS PIPELINE
+               ========================================================================== */
+            function clearRenderingCanvas() {
+                DOM.ctx.fillStyle = '#050b14';
+                DOM.ctx.fillRect(0, 0, CONFIG.canvasSize, CONFIG.canvasSize);
+
+                // Draw tactical background tracking wire lines vector canvas matrix grids
+                DOM.ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+                DOM.ctx.lineWidth = 1;
+                for (let i = 0; i <= state.gridSize; i++) {
+                    // Vertical Paths
+                    DOM.ctx.beginPath();
+                    DOM.ctx.moveTo(i * state.cellSize, 0);
+                    DOM.ctx.lineTo(i * state.cellSize, CONFIG.canvasSize);
+                    DOM.ctx.stroke();
+
+                    // Horizontal Paths
+                    DOM.ctx.beginPath();
+                    DOM.ctx.moveTo(0, i * state.cellSize);
+                    DOM.ctx.lineTo(CONFIG.canvasSize, i * state.cellSize);
+                    DOM.ctx.stroke();
+                }
+            }
+
+            function drawWorldGridEntities() {
+                const ctx = DOM.ctx;
+                const size = state.cellSize;
+
+                // 1. Draw Static Structure Obstacles Array Layers
+                ctx.fillStyle = '#455a64';
+                state.obstacles.forEach(obs => {
+                    ctx.save();
+                    ctx.fillStyle = '#37474f';
+                    ctx.strokeStyle = 'rgba(255,64,129,0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.fillRect(obs.x * size + 1, obs.y * size + 1, size - 2, size - 2);
+                    ctx.strokeRect(obs.x * size + 2, obs.y * size + 2, size - 4, size - 4);
+                    ctx.restore();
+                });
+
+                // 2. Draw Quantum Temporal Portals Vectors Elements
+                state.portals.forEach(p => {
+                    ctx.save();
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = p.color;
+                    ctx.strokeStyle = p.color;
+                    ctx.lineWidth = 3;
+                    
+                    // In-Gate Ring Drawing Nodes
+                    ctx.beginPath();
+                    ctx.arc(p.in.x * size + size/2, p.in.y * size + size/2, size/2 - 2, 0, Math.PI*2);
+                    ctx.stroke();
+
+                    // Out-Gate Ring Drawing Nodes
+                    ctx.beginPath();
+                    ctx.arc(p.out.x * size + size/2, p.out.y * size + size/2, size/2 - 2, 0, Math.PI*2);
+                    ctx.stroke();
+                    ctx.restore();
+                });
+
+                // 3. Draw Target Active Food Resource Entity Coordinates Nodes
+                const foodSpec = FOOD_TYPES[state.food.type];
+                ctx.save();
+                ctx.shadowBlur = 18;
+                ctx.shadowColor = foodSpec.color;
+                ctx.fillStyle = foodSpec.color;
+                
+                ctx.beginPath();
+                // Render customized geometric nodes depending on classification tag variables
+                if (state.food.type === 'golden') {
+                    // Diamond Shaped Vector Structures
+                    ctx.moveTo(state.food.x * size + size/2, state.food.y * size);
+                    ctx.lineTo(state.food.x * size + size, state.food.y * size + size/2);
+                    ctx.lineTo(state.food.x * size + size/2, state.food.y * size + size);
+                    ctx.lineTo(state.food.x * size, state.food.y * size + size/2);
+                } else if (state.food.type === 'toxic') {
+                    // Triangular Threat Form Vectors
+                    ctx.moveTo(state.food.x * size + size/2, state.food.y * size + 2);
+                    ctx.lineTo(state.food.x * size + size - 2, state.food.y * size + size - 2);
+                    ctx.lineTo(state.food.x * size + 2, state.food.y * size + size - 2);
+                } else {
+                    // Spherical Radial Nodes
+                    ctx.arc(state.food.x * size + size/2, state.food.y * size + size/2, size/2 - 2, 0, Math.PI*2);
+                }
+                ctx.fill();
+                ctx.restore();
+
+                // 4. Draw Snake Organism Component Segment Vectors Array Elements
+                const selectedSkinData = SKIN_CATALOGUE.find(s => s.id === state.equippedSkin) || SKIN_CATALOGUE[0];
+                state.tailGlowPulse += 0.08;
+
+                state.snake.forEach((segment, index) => {
+                    ctx.save();
+                    
+                    // Procedural Dynamic Shader Engine Configuration Setup logic nodes
+                    let fillColor = selectedSkinData.color1;
+                    if (selectedSkinData.render === 'gradient') {
+                        let ratio = index / state.snake.length;
+                        ctx.fillStyle = lerpColorRGB(selectedSkinData.color1, selectedSkinData.color2, ratio);
+                    } else if (selectedSkinData.render === 'plasma') {
+                        let dynamicHue = (Index * 15 + Date.now() * 0.1) % 360;
+                        fillColor = `hsl(${dynamicHue}, 100%, 50%)`;
+                        ctx.fillStyle = fillColor;
+                    } else if (selectedSkinData.render === 'void') {
+                        ctx.fillStyle = index === 0 ? '#7000ff' : `rgba(15, 15, 25, ${1 - (index/state.snake.length)})`;
+                        ctx.strokeStyle = '#7000ff';
+                        ctx.lineWidth = 1;
+                    } else if (selectedSkinData.render === 'glitch') {
+                        ctx.fillStyle = Math.random() > 0.85 ? '#ffffff' : selectedSkinData.color1;
+                    } else {
+                        ctx.fillStyle = fillColor;
+                    }
+
+                    // Setup Shadow Blurs selectively on main head nodes for frame processing optimization
+                    if (index === 0) {
+                        ctx.shadowBlur = 20;
+                        ctx.shadowColor = selectedSkinData.color1;
+                    } else {
+                        ctx.shadowBlur = 6;
+                        ctx.shadowColor = selectedSkinData.color2;
+                    }
+
+                    // Render Physical Segment Elements Box Coordinates Bounds
+                    const rx = segment.x * size + 1;
+                    const ry = segment.y * size + 1;
+                    const rSize = size - 2;
+                    
+                    // Curved Matrix Rendering for structural look pathing tracking nodes
+                    ctx.beginPath();
+                    ctx.rect(rx, ry, rSize, rSize);
+                    ctx.fill();
+                    if (selectedSkinData.render === 'void') ctx.stroke();
+                    
+                    // Extra detailed biometric drawing nodes overlay inside main head tracking segment points
+                    if (index === 0) {
+                        ctx.fillStyle = '#000000';
+                        // Draw ocular matrix interfaces targets nodes indicators inside frame segments
+                        const eyeOffset = size * 0.25;
+                        const eyeRadius = size * 0.08;
+                        ctx.beginPath();
+                        ctx.arc(rx + eyeOffset, ry + eyeOffset, eyeRadius, 0, Math.PI*2);
+                        ctx.arc(rx + rSize - eyeOffset, ry + eyeOffset, eyeRadius, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+
+                    ctx.restore();
+                });
+            }
+
+            // Math Helper: Interpolate Color values safely across frame mutations bounds
+            function lerpColorRGB(color1, color2, factor) {
+                // Parsing hex conversion mechanics logic channels
+                const parseHex = c => parseInt(c.replace('#', ''), 16);
+                let c1 = parseHex(color1), c2 = parseHex(color2);
+                
+                let r1 = (c1 >> 16) & 255, g1 = (c1 >> 8) & 255, b1 = c1 & 255;
+                let r2 = (c2 >> 16) & 255, g2 = (c2 >> 8) & 255, b2 = c2 & 255;
+                
+                let r = Math.round(r1 + factor * (r2 - r1));
+                let g = Math.round(g1 + factor * (g2 - g1));
+                let b = Math.round(b1 + factor * (b2 - b1));
+                
+                return `rgb(${r}, ${g}, ${b})`;
+            }
+
+            /* ==========================================================================
+               I. USER INTERFACE INTERACTION & APP CONTROLS DISPATCH CODES
+               ========================================================================== */
+            function setupInputEventListeners() {
+                // Master Keyboard Snapping Core Events Interface
+                window.addEventListener('keydown', (e) => {
+                    if (state.isGameOver || state.aiModeActive) return;
+
+                    let targetDirectionMutation = null;
+                    switch (e.key.toLowerCase()) {
+                        case 'w': case 'arrowup':
+                            if (state.direction.y !== 1) targetDirectionMutation = { x: 0, y: -1 };
+                            break;
+                        case 's': case 'arrowdown':
+                            if (state.direction.y !== -1) targetDirectionMutation = { x: 0, y: 1 };
+                            break;
+                        case 'a': case 'arrowleft':
+                            if (state.direction.x !== 1) targetDirectionMutation = { x: -1, y: 0 };
+                            break;
+                        case 'd': case 'arrowright':
+                            if (state.direction.x !== -1) targetDirectionMutation = { x: 1, y: 0 };
+                            break;
+                        case 'p': // Quick Pause Hotkey Node
+                            toggleGameplayCyclePause();
+                            break;
+                    }
+
+                    if (targetDirectionMutation) {
+                        state.nextDirection = targetDirectionMutation;
+                        SoundEngine.init(); // Lazy-init context upon structural interaction parameters
+                    }
+                });
+
+                // Control Action Buttons Bindings Nodes Pipeline
+                DOM.btnStart.addEventListener('click', () => {
+                    SoundEngine.init();
+                    SoundEngine.play('ui');
+                    initializeOperationalCycleLoop();
+                });
+
+                DOM.btnPause.addEventListener('click', () => {
+                    SoundEngine.play('ui');
+                    toggleGameplayCyclePause();
+                });
+
+                DOM.btnAI.addEventListener('click', () => {
+                    SoundEngine.play('ui');
+                    state.aiModeActive = !state.aiModeActive;
+                    if (state.aiModeActive) {
+                        state.telemetry.aiRuns++;
+                        saveTelemetryData();
+                    }
+                    DOM.btnAI.classList.toggle('primary', state.aiModeActive);
+                    showSystemToastNotification(state.aiModeActive ? "Neuromorphic AI Matrix Engaged!" : "Manual Command Restored.");
+                });
+
+                DOM.btnRestart.addEventListener('click', () => {
+                    SoundEngine.play('ui');
+                    DOM.overlayGameover.classList.remove('active');
+                    initializeOperationalCycleLoop();
+                });
+
+                // Dropdowns System State Interceptors Setup
+                DOM.selectTheme.addEventListener('change', (e) => {
+                    document.body.setAttribute('data-theme', e.target.value);
+                    SoundEngine.play('ui');
+                });
+
+                // Tabs Navigation Click Handler Configurations Setup
+                DOM.tabBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        SoundEngine.play('ui');
+                        DOM.tabBtns.forEach(b => b.classList.remove('active'));
+                        DOM.tabContents.forEach(c => c.classList.remove('active'));
+                        
+                        btn.classList.add('active');
+                        document.getElementById(btn.getAttribute('data-target')).classList.add('active');
+                    });
+                });
+            }
+
+            function initializeOperationalCycleLoop() {
+                clearTimeout(state.gameLoopId);
+                DOM.overlayStart.classList.remove('active');
+                DOM.overlayPause.classList.remove('active');
+                DOM.overlayGameover.classList.remove('active');
+                
+                initEngineVariables();
+                state.isSpawned = true;
+                state.telemetry.startTime = Date.now();
+                
+                DOM.btnPause.disabled = false;
+                DOM.btnStart.innerText = "Re-Initialize System";
+
+                // Invoke Game Matrix Execution Step Sequences
+                processGameTick();
+            }
+
+            function toggleGameplayCyclePause() {
+                if (!state.isSpawned || state.isGameOver) return;
+
+                state.isPaused = !state.isPaused;
+                if (state.isPaused) {
+                    clearTimeout(state.gameLoopId);
+                    DOM.overlayPause.classList.add('active');
+                    DOM.btnPause.innerText = "Resume Cycle";
+                } else {
+                    DOM.overlayPause.classList.remove('active');
+                    DOM.btnPause.innerText = "Pause Cycle";
+                    processGameTick();
+                }
+            }
+
+            /* ==========================================================================
+               J. LOCAL DATA STORE MANAGEMENT & GAME COMMERCE SHOP LOGIC
+               ========================================================================== */
+            function loadPersistentDataStorage() {
+                state.highScore = parseInt(localStorage.getItem(CONFIG.storageKeys.highScore), 10) || 0;
+                state.coins = parseInt(localStorage.getItem(CONFIG.storageKeys.coins), 10) || 0;
+                state.equippedSkin = localStorage.getItem(CONFIG.storageKeys.equippedSkin) || 'neon-classic';
+                
+                // Read Telemetry Block Node Serialization parameters arrays
+                try {
+                    const savedTelemetry = JSON.parse(localStorage.getItem(CONFIG.storageKeys.telemetry));
+                    if (savedTelemetry) state.telemetry = { ...state.telemetry, ...savedTelemetry };
+                } catch(e) { console.warn("Telemetry storage initialization exception trace:", e); }
+
+                syncDOMCounters();
+                rebuildShopUIMatrix();
+                rebuildAchievementsUIMatrix();
+            }
+
+            function syncDOMCounters() {
+                // String formatting pads numbers for sci-fi look
+                const padStr = num => String(num).padStart(4, '0');
+                DOM.score.innerText = padStr(state.score);
+                DOM.highScore.innerText = padStr(state.highScore);
+                DOM.coins.innerText = padStr(state.coins);
+                DOM.multiplier.innerText = state.multiplier.toFixed(2) + 'x';
+
+                // Tab Telemetry Elements
+                DOM.telEaten.innerText = state.telemetry.totalEaten;
+                DOM.telTime.innerText = state.telemetry.elapsedTime + 's';
+                DOM.telAI.innerText = state.telemetry.aiRuns;
+                DOM.telPortals.innerText = state.telemetry.portalsTraversed;
+            }
+
+            function rebuildShopUIMatrix() {
+                DOM.shopContainer.innerHTML = '';
+                
+                // Get ownership mapping array parameters string references
+                let ownedSkins = [];
+                try {
+                    ownedSkins = JSON.parse(localStorage.getItem(CONFIG.storageKeys.skins)) || ['neon-classic'];
+                } catch(e) { ownedSkins = ['neon-classic']; }
+
+                SKIN_CATALOGUE.forEach(skin => {
+                    const isOwned = ownedSkins.includes(skin.id);
+                    const isEquipped = state.equippedSkin === skin.id;
+
+                    const card = document.createElement('div');
+                    card.className = `shop-item ${isEquipped ? 'equipped' : ''}`;
+                    
+                    let buttonMarkup = '';
+                    if (isEquipped) {
+                        buttonMarkup = `<button class="custom-btn" style="width:auto; margin:0; font-size:0.7rem; padding:6px 12px; border-color:var(--accent-neon);" disabled>Active</button>`;
+                    } else if (isOwned) {
+                        buttonMarkup = `<button class="custom-btn primary action-skin-btn" data-id="${skin.id}" data-action="equip" style="width:auto; margin:0; font-size:0.7rem; padding:6px 12px;">Equip</button>`;
+                    } else {
+                        buttonMarkup = `<button class="custom-btn danger action-skin-btn" data-id="${skin.id}" data-action="buy" style="width:auto; margin:0; font-size:0.7rem; padding:6px 12px;">Buy [${skin.cost}]</button>`;
+                    }
+
+                    card.innerHTML = `
+                        <div style="max-width:70%;">
+                            <div class="shop-item-info-title" style="color:${skin.color1}">${skin.name}</div>
+                            <div class="shop-item-info-desc">${skin.desc}</div>
+                        </div>
+                        <div>${buttonMarkup}</div>
+                    `;
+                    DOM.shopContainer.appendChild(card);
+                });
+
+                // Attach dynamically allocated shop control button actions callbacks
+                document.querySelectorAll('.action-skin-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const id = btn.getAttribute('data-id');
+                        const action = btn.getAttribute('data-action');
+                        executeSkinCommerceAction(id, action);
+                    });
+                });
+            }
+
+            function executeSkinCommerceAction(skinId, action) {
+                SoundEngine.play('ui');
+                let ownedSkins = JSON.parse(localStorage.getItem(CONFIG.storageKeys.skins)) || ['neon-classic'];
+                const targetedSkin = SKIN_CATALOGUE.find(s => s.id === skinId);
+
+                if (action === 'buy') {
+                    if (state.coins >= targetedSkin.cost) {
+                        state.coins -= targetedSkin.cost;
+                        ownedSkins.push(skinId);
+                        localStorage.setItem(CONFIG.storageKeys.coins, state.coins);
+                        localStorage.setItem(CONFIG.storageKeys.skins, JSON.stringify(ownedSkins));
+                        showSystemToastNotification(`Skin UNLOCKED: ${targetedSkin.name}`);
+                    } else {
+                        showSystemToastNotification("Insufficient Omni-Coins balance allocation!");
+                        return;
+                    }
+                } else if (action === 'equip') {
+                    state.equippedSkin = skinId;
+                    localStorage.setItem(CONFIG.storageKeys.equippedSkin, skinId);
+                    showSystemToastNotification(`Matrix Mesh set: ${targetedSkin.name}`);
+                }
+
+                syncDOMCounters();
+                rebuildShopUIMatrix();
+                if (state.isSpawned && !state.isGameOver) clearRenderingCanvas(), drawWorldGridEntities();
+            }
+
+            /* ==========================================================================
+               K. DATA VAULT METRICS & ACHIEVEMENTS PROGRESSION EVALUATOR
+               ========================================================================== */
+            function rebuildAchievementsUIMatrix() {
+                DOM.achieveContainer.innerHTML = '';
+                
+                ACHIEVEMENT_REGISTRY.forEach(ach => {
+                    const row = document.createElement('div');
+                    row.className = `achievement-row ${ach.unlocked ? 'unlocked' : ''}`;
+                    row.id = `ach-node-${ach.id}`;
+                    row.innerHTML = `
+                        <div class="achievement-icon">${ach.unlocked ? ach.icon : '🔒'}</div>
+                        <div>
+                            <div style="font-size:0.85rem; font-weight:700; color:${ach.unlocked ? 'var(--accent-neon)' : 'inherit'}">${ach.title}</div>
+                            <div style="font-size:0.7rem; color:var(--text-secondary);">${ach.desc}</div>
+                        </div>
+                    `;
+                    DOM.achieveContainer.appendChild(row);
+                });
+            }
+
+            function evaluateAchievementsMatrix() {
+                let statusMutationDetected = false;
+
+                ACHIEVEMENT_REGISTRY.forEach(ach => {
+                    if (!ach.unlocked && ach.check()) {
+                        ach.unlocked = true;
+                        statusMutationDetected = true;
+                        showSystemToastNotification(`Achievement Unlocked: ${ach.title}`);
+                    }
+                });
+
+                if (statusMutationDetected) {
+                    rebuildAchievementsUIMatrix();
+                }
+            }
+
+            function processSystemTelemetryCounters() {
+                if (!state.isSpawned || state.isPaused || state.isGameOver) return;
+                
+                // Track dynamic runtimes metric indexes variables
+                const currentElapsed = Math.floor((Date.now() - state.telemetry.startTime) / 1000);
+                if (currentElapsed > 0 && currentElapsed !== state.telemetry.elapsedTime) {
+                    state.telemetry.elapsedTime++;
+                    syncDOMCounters();
+                }
+            }
+
+            function saveTelemetryData() {
+                localStorage.setItem(CONFIG.storageKeys.telemetry, JSON.stringify(state.telemetry));
+            }
+
+            function showSystemToastNotification(message) {
+                DOM.toastText.innerText = message;
+                DOM.toast.classList.add('show');
+                
+                setTimeout(() => {
+                    DOM.toast.classList.remove('show');
+                }, 3000);
+            }
+
+            /* ==========================================================================
+               L. COLD BOOT INITIALIZATION DISPATCH ENTRYPOINT
+               ========================================================================== */
+            function runtimeSystemColdBoot() {
+                setupInputEventListeners();
+                loadPersistentDataStorage();
+                clearRenderingCanvas();
+                
+                // Set default matrix structure styles initialization parameters
+                document.body.setAttribute('data-theme', DOM.selectTheme.value);
+            }
+
+            // Run system bootstrap sequence
+            window.addEventListener('DOMContentLoaded', runtimeSystemColdBoot);
+
+        })();
+    </script>
+</body>
+</html>
