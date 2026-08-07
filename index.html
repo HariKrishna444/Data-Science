@@ -682,7 +682,7 @@ function renderConsolidatedPreview(body) {
   html += `<div class="doc-center-bold">CONSOLIDATED SEATING PLAN</div>`;
   html += `<div class="doc-center-bold">Date of Examinations : ${escapeHtml(c.examDate)}</div>`;
   html += `<div class="doc-center-bold">Timings: ${escapeHtml(c.timings)}</div>`;
-  html += `<table class="sheet" style="margin-top:16px;width:100%;"><thead><tr><th>S.No</th><th>Room. No</th><th>No. of Students</th><th>UR Numbers</th><th>Department</th></tr></thead><tbody>`;
+  html += `<table class="sheet" style="margin-top:16px;width:100%;table-layout:fixed;"><colgroup><col style="width:6%"><col style="width:10%"><col style="width:14%"><col style="width:36%"><col style="width:34%"></colgroup><thead><tr><th>S.No</th><th>Room. No</th><th>No. of Students</th><th>UR Numbers</th><th>Department</th></tr></thead><tbody>`;
   rows.forEach((r, i) => {
     html += `<tr><td>${i + 1}</td><td>${escapeHtml(r.roomNo)}</td><td>${escapeHtml(String(r.students))}</td><td class="left wrap">${urNumbersGridHtml(r.urNumbers)}</td><td>${escapeHtml(r.department)}</td></tr>`;
   });
