@@ -66,7 +66,6 @@ table.sheet th, table.sheet td { border: 1.5px solid #000; padding: 6px 8px; tex
 table.sheet th { background: #efe8d8; border: 1.5px solid #000; }
 table.sheet td.left { text-align: left; }
 table.sheet td.wrap { white-space: normal; }
-.ur-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; row-gap: 2px; text-align: left; }
 table.sheet td.total-label { font-weight: bold; }
 
 .doc-note { margin-top: 14px; font-size: 12px; text-align: center; }
@@ -650,17 +649,19 @@ function renderPreview() {
   }
 }
 
-/* Build a true 2-item-per-row grid for the UR Numbers cell (row-major
-   order), so the printed/on-screen layout always shows exactly two
-   columns regardless of cell width or font size. */
+/* Two items per line, normal "comma + space" spacing (no big column
+   gap) — e.g. "25011CSEAI0030, 25011CSEAI0064," then a line break. */
 function urNumbersGridHtml(urString) {
   if (!urString) return "";
   const parts = urString.split(",").map((p) => p.trim()).filter(Boolean);
   if (parts.length <= 1) return escapeHtml(urString);
-  const cells = parts
-    .map((p, i) => `<span>${escapeHtml(p)}${i < parts.length - 1 ? "," : ""}</span>`)
-    .join("");
-  return `<div class="ur-grid">${cells}</div>`;
+  const lines = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    const pair = parts.slice(i, i + 2);
+    const isLast = i + 2 >= parts.length;
+    lines.push(escapeHtml(pair.join(", ")) + (isLast ? "" : ","));
+  }
+  return lines.join("<br>");
 }
 
 function renderConsolidatedPreview(body) {
