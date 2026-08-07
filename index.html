@@ -65,6 +65,28 @@ table.sheet { width: 100%; border-collapse: collapse; font-size: 12px; margin-to
 table.sheet th, table.sheet td { border: 1px solid var(--line); padding: 5px 7px; text-align: center; white-space: nowrap; }
 table.sheet th { background: #efe8d8; }
 table.sheet td.left { text-align: left; }
+table.sheet td.wrap { white-space: normal; }
+table.sheet td.total-label { font-weight: bold; }
+
+.doc-note { margin-top: 14px; font-size: 12px; text-align: center; }
+.doc-sig-row { display: flex; justify-content: space-between; margin-top: 48px; font-weight: bold; font-size: 14px; }
+
+.doc-header-left { position: relative; text-align: left; padding-top: 4px; border-bottom: 2px solid var(--ink); padding-bottom: 10px; margin-bottom: 12px; }
+.doc-logo-sm { height: 62px; display: block; }
+.doc-circular-title { text-align: center; font-weight: bold; text-decoration: underline; font-size: 15px; margin-top: 12px; }
+.doc-center-bold { text-align: center; font-weight: bold; font-size: 14px; margin-top: 2px; }
+
+.tab.tab-small { padding: 8px 12px; font-size: 12px; }
+
+.room-row { display: flex; gap: 4px; margin-bottom: 6px; align-items: center; }
+.room-row input { flex: 1 1 auto; min-width: 0; padding: 6px 7px; font-size: 11px; border: 1px solid var(--line); border-radius: 4px; font-family: sans-serif; }
+.room-row input.rn { flex: 0 0 54px; }
+.room-row input.ns { flex: 0 0 40px; }
+.room-remove { background: var(--maroon); color: #fff; border-radius: 4px; width: 24px; height: 24px; font-size: 14px; line-height: 1; flex: 0 0 auto; }
+.room-remove:hover { background: var(--maroon-dark); }
+.addRoomBtn { background: var(--green); color: #fff; padding: 9px; font-size: 13px; font-weight: 600; width: 100%; margin-top: 6px; }
+.addRoomBtn:hover { background: var(--green-dark); }
+.consol-total { font-family: sans-serif; font-size: 12px; color: var(--muted); margin-top: 10px; }
 
 @media print {
   body * { visibility: hidden; }
@@ -82,34 +104,59 @@ table.sheet td.left { text-align: left; }
 
   <main class="layout">
     <section class="panel">
-      <div class="dropzone" id="dropzone">
-        <p><strong>Drop attendance sheet .docx</strong></p>
-        <p class="hint">Sl.No / Register Number / Name table required</p>
-        <button id="chooseBtn" type="button">Choose File</button>
-        <input type="file" id="fileInput" accept=".docx" hidden />
-        <div id="fileStatus" class="status"></div>
-      </div>
+      <div id="rosterPanel">
+        <div class="dropzone" id="dropzone">
+          <p><strong>Drop attendance sheet .docx</strong></p>
+          <p class="hint">Sl.No / Register Number / Name table required</p>
+          <button id="chooseBtn" type="button">Choose File</button>
+          <input type="file" id="fileInput" accept=".docx" hidden />
+          <div id="fileStatus" class="status"></div>
+        </div>
 
-      <div class="card">
-        <h3>Sheet Details</h3>
-        <div id="fields"></div>
-        <label class="field">
-          <span>Rows per Column (seat block)</span>
-          <input id="rowsPerCol" type="number" value="7" min="1" max="20" />
-        </label>
-      </div>
+        <div class="card">
+          <h3>Sheet Details</h3>
+          <div id="fields"></div>
+          <label class="field">
+            <span>Rows per Column (seat block)</span>
+            <input id="rowsPerCol" type="number" value="7" min="1" max="20" />
+          </label>
+        </div>
 
-      <div class="card stat">
-        <div>
-          <div class="stat-num" id="studentCount">0</div>
-          <div class="stat-label">Students loaded</div>
+        <div class="card stat">
+          <div>
+            <div class="stat-num" id="studentCount">0</div>
+            <div class="stat-label">Students loaded</div>
+          </div>
         </div>
       </div>
 
-      <div class="actions">
+      <div id="consolidatedPanel" style="display:none;">
+        <div class="card">
+          <h3>Consolidated Plan Details</h3>
+          <label class="field"><span>Circular Date</span><input id="consCircularDate" /></label>
+          <label class="field"><span>Examination Title</span><input id="consExamTitle" /></label>
+          <label class="field"><span>Date of Examinations</span><input id="consExamDate" /></label>
+          <label class="field"><span>Timings</span><input id="consTimings" /></label>
+        </div>
+        <div class="card">
+          <h3>Rooms</h3>
+          <div id="consolidatedRows"></div>
+          <button id="addRoomBtn" type="button" class="addRoomBtn">+ Add Room</button>
+          <div class="consol-total" id="consolTotal"></div>
+        </div>
+      </div>
+
+      <div id="rosterActions" class="actions">
         <button id="exportAttendance" class="btn green" disabled type="button">Export Attendance (.xlsx)</button>
-        <button id="exportSeatingXlsx" class="btn green" disabled type="button">Export Seating Plan (.xlsx)</button>
-        <button id="exportSeatingPdf" class="btn red" disabled type="button">Export Seating Plan (.pdf)</button>
+        <button id="exportSeatingXlsx" class="btn green" disabled type="button">Export Room Wise Seating (.xlsx)</button>
+        <button id="exportSeatingPdf" class="btn red" disabled type="button">Export Room Wise Seating (.pdf)</button>
+        <button id="exportSeatingPlanXlsx" class="btn green" disabled type="button">Export Seating Plan (.xlsx)</button>
+        <button id="exportSeatingPlanPdf" class="btn red" disabled type="button">Export Seating Plan (.pdf)</button>
+      </div>
+
+      <div id="consolidatedActions" class="actions" style="display:none;">
+        <button id="exportConsolidatedXlsx" class="btn green" type="button">Export Consolidated Plan (.xlsx)</button>
+        <button id="exportConsolidatedPdf" class="btn red" type="button">Export Consolidated Plan (.pdf)</button>
       </div>
 
       <p class="firebase-note" id="firebaseNote"></p>
@@ -117,8 +164,10 @@ table.sheet td.left { text-align: left; }
 
     <section class="preview">
       <div class="tabs">
-        <button id="tabRoster" class="tab active" type="button">Attendance Sheet</button>
-        <button id="tabSeating" class="tab" type="button">Seating Plan</button>
+        <button id="tabRoster" class="tab tab-small active" type="button">Attendance Sheet</button>
+        <button id="tabSeating" class="tab tab-small" type="button">Room Wise Seating Plan</button>
+        <button id="tabSeatingPlan" class="tab tab-small" type="button">Seating Plan</button>
+        <button id="tabConsolidated" class="tab tab-small" type="button">Consolidated Seating Plan</button>
       </div>
       <div id="previewBody" class="preview-body">
         <p class="empty">Upload an attendance .docx on the left to generate a preview.</p>
@@ -230,7 +279,33 @@ const state = {
     time: "09:30 AM to 12:30 PM",
   },
   students: [],
-  tab: "roster",
+  tab: "roster", // "roster" | "seating" | "seatingPlan" | "consolidated"
+  consolidated: {
+    circularDate: "22-05-2026",
+    examTitle: "I. B.Tech - II Semester End Examination - May/June 2026",
+    examDate: "23-05-2026",
+    timings: "09:30 AM to 12:30 PM",
+    rows: [
+      { roomNo: "1201", students: 35, urNumbers: "2501100CSE0001 TO 2501100CSE0038", department: "CSE" },
+      { roomNo: "1202", students: 35, urNumbers: "2501100CSE0040 TO 2501100CSE0075", department: "CSE" },
+      { roomNo: "1207", students: 35, urNumbers: "2501100CSE0076 TO 2501100CSE0112", department: "CSE" },
+      { roomNo: "1214", students: 32, urNumbers: "2501100CSE0113 TO 2501100CSE0145", department: "CSE" },
+      { roomNo: "1215", students: 35, urNumbers: "25011CSEAI0001 TO 25011CSEAI0036", department: "CSE(AI&ML)" },
+      { roomNo: "1216", students: 35, urNumbers: "25011CSEAI0037 TO 25011CSEAI0073", department: "CSE(AI&ML)" },
+      { roomNo: "1217", students: 35, urNumbers: "25011CSEAI0075 TO 25011CSEAI0110", department: "CSE(AI&ML)" },
+      { roomNo: "1218", students: 35, urNumbers: "25011CSEAI0111 TO 25011CSEAI0146", department: "CSE(AI&ML)" },
+      { roomNo: "1219", students: 35, urNumbers: "25011CSEAI0147 TO 25011CSEAI0184", department: "CSE(AI&ML)" },
+      { roomNo: "1220", students: 35, urNumbers: "25011CSEAI0185 TO 25011CSEAI0219", department: "CSE(AI&ML)" },
+      { roomNo: "1221", students: 35, urNumbers: "25011CSEAI0220 TO 25011CSEAI0254", department: "CSE(AI&ML)" },
+      { roomNo: "1106", students: 35, urNumbers: "25011CSEAI0255 TO 25011CSEAI0290", department: "CSE(AI&ML)" },
+      { roomNo: "1107", students: 35, urNumbers: "25011CSEAI0291 TO 25011CSEAI0326", department: "CSE(AI&ML)" },
+      { roomNo: "1113", students: 35, urNumbers: "25011CSEAI0327 TO 25011CSEAI0363", department: "CSE(AI&ML)" },
+      { roomNo: "1115", students: 35, urNumbers: "25011CSEAI0364 TO 25011CSEAI0401", department: "CSE(AI&ML)" },
+      { roomNo: "1116", students: 35, urNumbers: "25011CSEAI0402 TO 25011CSEAI0409, 25011CSEDS0001 TO 25011CSEDS0027", department: "CSE(AI&ML) , CSE(DS)" },
+      { roomNo: "1117", students: 29, urNumbers: "25011CSECS0001 TO 25011CSECS0030", department: "CSE(CS)" },
+      { roomNo: "1118", students: 25, urNumbers: "25011CSERP0001 TO 25011CSERP0027", department: "CSE(ERP)" },
+    ],
+  },
 };
 
 /* =================================================================
@@ -278,7 +353,7 @@ async function handleFile(file) {
     statusEl.textContent = `Imported ${students.length} students from "${file.name}".`;
     statusEl.className = "status ok";
     document.getElementById("studentCount").textContent = students.length;
-    ["exportAttendance", "exportSeatingXlsx", "exportSeatingPdf"].forEach(
+    ["exportAttendance", "exportSeatingXlsx", "exportSeatingPdf", "exportSeatingPlanXlsx", "exportSeatingPlanPdf"].forEach(
       (id) => (document.getElementById(id).disabled = false)
     );
     renderPreview();
@@ -323,16 +398,91 @@ async function parseRosterDocx(file) {
    ================================================================= */
 document.getElementById("tabRoster").onclick = () => switchTab("roster");
 document.getElementById("tabSeating").onclick = () => switchTab("seating");
+document.getElementById("tabSeatingPlan").onclick = () => switchTab("seatingPlan");
+document.getElementById("tabConsolidated").onclick = () => switchTab("consolidated");
 document.getElementById("rowsPerCol").addEventListener("input", () => {
-  if (state.tab === "seating") renderPreview();
+  if (state.tab === "seating" || state.tab === "seatingPlan") renderPreview();
 });
 
 function switchTab(tab) {
   state.tab = tab;
   document.getElementById("tabRoster").classList.toggle("active", tab === "roster");
   document.getElementById("tabSeating").classList.toggle("active", tab === "seating");
+  document.getElementById("tabSeatingPlan").classList.toggle("active", tab === "seatingPlan");
+  document.getElementById("tabConsolidated").classList.toggle("active", tab === "consolidated");
+
+  const isConsolidated = tab === "consolidated";
+  document.getElementById("rosterPanel").style.display = isConsolidated ? "none" : "";
+  document.getElementById("consolidatedPanel").style.display = isConsolidated ? "" : "none";
+  document.getElementById("rosterActions").style.display = isConsolidated ? "none" : "";
+  document.getElementById("consolidatedActions").style.display = isConsolidated ? "" : "none";
+
   renderPreview();
 }
+
+/* =================================================================
+   CONSOLIDATED SEATING PLAN — sidebar editor
+   ================================================================= */
+const CONSOL_FIELD_DEFS = [
+  { id: "consCircularDate", key: "circularDate" },
+  { id: "consExamTitle", key: "examTitle" },
+  { id: "consExamDate", key: "examDate" },
+  { id: "consTimings", key: "timings" },
+];
+CONSOL_FIELD_DEFS.forEach((f) => {
+  const el = document.getElementById(f.id);
+  el.value = state.consolidated[f.key];
+  el.addEventListener("input", () => {
+    state.consolidated[f.key] = el.value;
+    if (state.tab === "consolidated") renderPreview();
+  });
+});
+
+function renderConsolidatedRows() {
+  const container = document.getElementById("consolidatedRows");
+  container.innerHTML = "";
+  state.consolidated.rows.forEach((r, i) => {
+    const div = document.createElement("div");
+    div.className = "room-row";
+    div.innerHTML = `
+      <input class="rn" placeholder="Room" data-i="${i}" data-key="roomNo" value="${escapeHtml(r.roomNo)}" />
+      <input class="ns" placeholder="No." data-i="${i}" data-key="students" value="${escapeHtml(String(r.students))}" />
+      <input placeholder="UR Numbers" data-i="${i}" data-key="urNumbers" value="${escapeHtml(r.urNumbers)}" />
+      <input placeholder="Dept" data-i="${i}" data-key="department" value="${escapeHtml(r.department)}" style="flex:0 0 90px;" />
+      <button type="button" class="room-remove" data-remove="${i}">×</button>
+    `;
+    container.appendChild(div);
+  });
+  updateConsolTotal();
+}
+
+function updateConsolTotal() {
+  const total = state.consolidated.rows.reduce((sum, r) => sum + (Number(r.students) || 0), 0);
+  document.getElementById("consolTotal").textContent =
+    `${state.consolidated.rows.length} room(s) · ${total} student(s) total`;
+}
+
+document.getElementById("consolidatedRows").addEventListener("input", (e) => {
+  const i = e.target.dataset.i;
+  const key = e.target.dataset.key;
+  if (i === undefined || !key) return;
+  state.consolidated.rows[i][key] = e.target.value;
+  updateConsolTotal();
+  if (state.tab === "consolidated") renderPreview();
+});
+document.getElementById("consolidatedRows").addEventListener("click", (e) => {
+  const idx = e.target.dataset.remove;
+  if (idx === undefined) return;
+  state.consolidated.rows.splice(Number(idx), 1);
+  renderConsolidatedRows();
+  if (state.tab === "consolidated") renderPreview();
+});
+document.getElementById("addRoomBtn").addEventListener("click", () => {
+  state.consolidated.rows.push({ roomNo: "", students: "", urNumbers: "", department: "" });
+  renderConsolidatedRows();
+  if (state.tab === "consolidated") renderPreview();
+});
+renderConsolidatedRows();
 
 function getRowsPerCol() {
   return Math.max(1, Number(document.getElementById("rowsPerCol").value) || 7);
@@ -340,21 +490,25 @@ function getRowsPerCol() {
 
 function renderPreview() {
   const body = document.getElementById("previewBody");
+
+  if (state.tab === "consolidated") {
+    renderConsolidatedPreview(body);
+    return;
+  }
+
   const h = state.header;
   if (!state.students.length) {
     body.innerHTML = `<p class="empty">Upload an attendance .docx on the left to generate a preview.</p>`;
     return;
   }
 
-  // Letterhead: logo, exam title, room no (seating only), date pinned top-right
-  let html = `<div class="doc-header">`;
-  html += `<div class="doc-date">Date:${escapeHtml(h.date)}</div>`;
-  html += `<img class="doc-logo" src="${UNIVERSITY_LOGO_BASE64}" alt="${escapeHtml(h.institution)} logo" />`;
-  html += `<div class="doc-title">${escapeHtml(h.examTitle)}</div>`;
-  if (state.tab === "seating") html += `<div class="doc-title">Room No : ${escapeHtml(h.roomNo)}</div>`;
-  html += `</div>`;
-
   if (state.tab === "roster") {
+    // Letterhead: logo, exam title, date pinned top-right
+    let html = `<div class="doc-header">`;
+    html += `<div class="doc-date">Date:${escapeHtml(h.date)}</div>`;
+    html += `<img class="doc-logo" src="${UNIVERSITY_LOGO_BASE64}" alt="${escapeHtml(h.institution)} logo" />`;
+    html += `<div class="doc-title">${escapeHtml(h.examTitle)}</div>`;
+    html += `</div>`;
     html += `<div class="doc-meta">`;
     html += `<div><b>Course Code &amp; Title :</b> ${escapeHtml(h.courseCode)}</div>`;
     html += `<div class="doc-row"><span><b>Branch:</b> ${escapeHtml(h.branch)}</span><span><b>Time:</b> ${escapeHtml(h.time)}</span></div>`;
@@ -364,9 +518,20 @@ function renderPreview() {
       html += `<tr><td>${s.slNo}</td><td class="left">${escapeHtml(s.register)}</td><td class="left">${escapeHtml(s.name)}</td><td></td><td></td></tr>`;
     });
     html += `</tbody></table>`;
-  } else {
+    body.innerHTML = html;
+    return;
+  }
+
+  if (state.tab === "seating") {
+    // Room Wise Seating Plan (original compact template)
     const rowsPerCol = getRowsPerCol();
     const cols = Math.max(1, Math.ceil(state.students.length / rowsPerCol));
+    let html = `<div class="doc-header">`;
+    html += `<div class="doc-date">Date:${escapeHtml(h.date)}</div>`;
+    html += `<img class="doc-logo" src="${UNIVERSITY_LOGO_BASE64}" alt="${escapeHtml(h.institution)} logo" />`;
+    html += `<div class="doc-title">${escapeHtml(h.examTitle)}</div>`;
+    html += `<div class="doc-title">Room No : ${escapeHtml(h.roomNo)}</div>`;
+    html += `</div>`;
     html += `<div class="doc-meta">`;
     html += `<div><b>Course Code &amp; Title :</b> ${escapeHtml(h.courseCode)}</div>`;
     html += `<div class="doc-row"><span><b>Branch:</b> ${escapeHtml(h.branch)}</span><span><b>Time:</b> ${escapeHtml(h.time)}</span></div>`;
@@ -387,7 +552,72 @@ function renderPreview() {
     }
     html += `</tbody></table>`;
     html += `<div class="doc-signature">Signature of Chief Superintendent</div>`;
+    body.innerHTML = html;
+    return;
   }
+
+  if (state.tab === "seatingPlan") {
+    // Seating Plan — matches the official room-slip circular template
+    // (logo, YAMNAMPET line, Date of Exam/Room No row, note text, dual signatures)
+    const rowsPerCol = getRowsPerCol();
+    const cols = Math.max(1, Math.ceil(state.students.length / rowsPerCol));
+    let html = `<div class="doc-header">`;
+    html += `<img class="doc-logo" src="${UNIVERSITY_LOGO_BASE64}" alt="${escapeHtml(h.institution)} logo" />`;
+    html += `<div style="font-weight:bold;font-size:12px;">YAMNAMPET, GHATKESAR</div>`;
+    html += `<div class="doc-title">${escapeHtml(h.examTitle)}</div>`;
+    html += `</div>`;
+    html += `<div class="doc-meta">`;
+    html += `<div class="doc-row"><span><b>Date of Exam:</b> ${escapeHtml(h.date)}</span><span><b>Room No:</b> ${escapeHtml(h.roomNo)}</span></div>`;
+    html += `<div class="doc-row"><span><b>Branch:</b> ${escapeHtml(h.branch)}</span><span><b>Time:</b> ${escapeHtml(h.time)}</span></div>`;
+    html += `<div><b>Course Code &amp; Title :</b> ${escapeHtml(h.courseCode)}</div>`;
+    html += `</div>`;
+    html += `<table class="sheet" style="margin-top:14px;"><thead><tr>`;
+    for (let c = 0; c < cols; c++) html += `<th>Seat No</th><th>UR Number</th>`;
+    html += `</tr></thead><tbody>`;
+    for (let r = 0; r < rowsPerCol; r++) {
+      html += "<tr>";
+      for (let c = 0; c < cols; c++) {
+        const seatNo = seatNumberAt(r, c, rowsPerCol);
+        const inRange = seatNo <= state.students.length;
+        const st = inRange ? state.students[seatNo - 1] : null;
+        html += `<td>${inRange ? seatNo : ""}</td><td>${st ? escapeHtml(st.register) : ""}</td>`;
+      }
+      html += "</tr>";
+    }
+    html += `</tbody></table>`;
+    html += `<div class="doc-note">Cross the box containing the hall ticket number with red pen when the candidate is absent. Seating should be strictly arranged according to the above plan.</div>`;
+    html += `<div class="doc-sig-row"><span>Signature of Hall Superintendent</span><span>Signature of Chief Superintendent</span></div>`;
+    body.innerHTML = html;
+    return;
+  }
+}
+
+function renderConsolidatedPreview(body) {
+  const c = state.consolidated;
+  const rows = c.rows;
+  if (!rows.length) {
+    body.innerHTML = `<p class="empty">Add at least one room on the left to generate the consolidated seating plan.</p>`;
+    return;
+  }
+  const total = rows.reduce((sum, r) => sum + (Number(r.students) || 0), 0);
+
+  let html = `<div class="doc-header-left">`;
+  html += `<div class="doc-date">Date: ${escapeHtml(c.circularDate)}</div>`;
+  html += `<img class="doc-logo-sm" src="${UNIVERSITY_LOGO_BASE64}" alt="${escapeHtml(state.header.institution)} logo" />`;
+  html += `</div>`;
+  html += `<div class="doc-circular-title">CIRCULAR</div>`;
+  html += `<div class="doc-center-bold">${escapeHtml(c.examTitle)}</div>`;
+  html += `<div class="doc-center-bold">CONSOLIDATED SEATING PLAN</div>`;
+  html += `<div class="doc-center-bold">Date of Examinations : ${escapeHtml(c.examDate)}</div>`;
+  html += `<div class="doc-center-bold">Timings: ${escapeHtml(c.timings)}</div>`;
+  html += `<table class="sheet" style="margin-top:16px;width:100%;"><thead><tr><th>S.No</th><th>Room. No</th><th>No. of Students</th><th>UR Numbers</th><th>Department</th></tr></thead><tbody>`;
+  rows.forEach((r, i) => {
+    html += `<tr><td>${i + 1}</td><td>${escapeHtml(r.roomNo)}</td><td>${escapeHtml(String(r.students))}</td><td class="left wrap">${escapeHtml(r.urNumbers)}</td><td>${escapeHtml(r.department)}</td></tr>`;
+  });
+  html += `<tr><td class="total-label" colspan="2">Total</td><td class="total-label">${total}</td><td></td><td></td></tr>`;
+  html += `<tr><td colspan="5" class="left wrap">Note: All students are instructed to be seated in their respective exam hall 10min. before the commencement of exam.</td></tr>`;
+  html += `</tbody></table>`;
+  html += `<div class="doc-sig-row" style="justify-content:flex-end;"><span>Chief Superintendent</span></div>`;
   body.innerHTML = html;
 }
 
@@ -552,6 +782,249 @@ document.getElementById("exportSeatingPdf").onclick = () => {
 
   const blob = doc.output("blob");
   archiveToFirebase(fileName, blob, { type: "seating-pdf", header: h });
+};
+
+/* =================================================================
+   EXPORT: Seating Plan (circular template) .xlsx / .pdf
+   ================================================================= */
+document.getElementById("exportSeatingPlanXlsx").onclick = () => {
+  const h = state.header;
+  const rowsPerCol = getRowsPerCol();
+  const cols = Math.max(1, Math.ceil(state.students.length / rowsPerCol));
+
+  const headRow = [];
+  for (let c = 0; c < cols; c++) headRow.push("Seat No", "UR Number");
+  const lastCol = headRow.length - 1;
+
+  const title = [
+    [h.institution],
+    ["YAMNAMPET, GHATKESAR"],
+    [h.examTitle],
+    [`Date of Exam: ${h.date}        Room No: ${h.roomNo}`],
+    [`Branch: ${h.branch}        Time: ${h.time}`],
+    [`Course Code & Title : ${h.courseCode}`],
+    [],
+    headRow,
+  ];
+  const titleRowCount = title.length;
+
+  const body = [];
+  for (let r = 0; r < rowsPerCol; r++) {
+    const line = [];
+    for (let c = 0; c < cols; c++) {
+      const seatNo = seatNumberAt(r, c, rowsPerCol);
+      const st = state.students[seatNo - 1];
+      if (seatNo <= state.students.length) line.push(seatNo, st ? st.register : "");
+      else line.push("", "");
+    }
+    body.push(line);
+  }
+
+  const noteRow = Array(headRow.length).fill("");
+  noteRow[0] =
+    "Cross the box containing the hall ticket number with red pen when the candidate is absent. Seating should be strictly arranged according to the above plan.";
+  const sigRow = Array(headRow.length).fill("");
+  sigRow[0] = "Signature of Hall Superintendent";
+  sigRow[lastCol] = "Signature of Chief Superintendent";
+
+  const ws = XLSX.utils.aoa_to_sheet([...title, ...body, [], noteRow, [], sigRow]);
+  ws["!merges"] = [0, 1, 2, 3, 4, 5].map((r) => ({ s: { r, c: 0 }, e: { r, c: lastCol } }));
+  const noteRowIdx = titleRowCount + rowsPerCol + 1;
+  ws["!merges"].push({ s: { r: noteRowIdx, c: 0 }, e: { r: noteRowIdx, c: lastCol } });
+  ws["!cols"] = Array(headRow.length).fill({ wch: 14 });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Seating Plan");
+  const fileName = `SeatingPlan_Circular_Room${h.roomNo || ""}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+
+  const blob = new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  archiveToFirebase(fileName, blob, { type: "seating-plan-circular", header: h });
+};
+
+document.getElementById("exportSeatingPlanPdf").onclick = () => {
+  const h = state.header;
+  const rowsPerCol = getRowsPerCol();
+  const cols = Math.max(1, Math.ceil(state.students.length / rowsPerCol));
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  const logoW = 120, logoH = 50;
+  doc.addImage(UNIVERSITY_LOGO_BASE64, "PNG", pageWidth / 2 - logoW / 2, 20, logoW, logoH);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("YAMNAMPET, GHATKESAR", pageWidth / 2, 82, { align: "center" });
+
+  doc.setFontSize(15);
+  doc.text(h.examTitle, pageWidth / 2, 102, { align: "center" });
+
+  doc.setFontSize(10);
+  doc.text(`Date of Exam: ${h.date}`, 40, 126);
+  doc.text(`Room No: ${h.roomNo}`, pageWidth - 40, 126, { align: "right" });
+  doc.text(`Branch: ${h.branch}`, 40, 142);
+  doc.text(`Time: ${h.time}`, pageWidth - 40, 142, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.text(`Course Code & Title : ${h.courseCode}`, 40, 158);
+
+  const head = [[]];
+  for (let c = 0; c < cols; c++) head[0].push("Seat No", "UR Number");
+
+  const body = [];
+  for (let r = 0; r < rowsPerCol; r++) {
+    const line = [];
+    for (let c = 0; c < cols; c++) {
+      const seatNo = seatNumberAt(r, c, rowsPerCol);
+      const st = state.students[seatNo - 1];
+      if (seatNo <= state.students.length) line.push(String(seatNo), st ? st.register : "");
+      else line.push("", "");
+    }
+    body.push(line);
+  }
+
+  doc.autoTable({
+    head,
+    body,
+    startY: 172,
+    theme: "grid",
+    styles: { fontSize: 8, halign: "center", cellPadding: 4 },
+    headStyles: { fillColor: [239, 232, 216], textColor: [35, 31, 26] },
+  });
+
+  const afterTableY = doc.lastAutoTable.finalY + 24;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  const noteLines = doc.splitTextToSize(
+    "Cross the box containing the hall ticket number with red pen when the candidate is absent. Seating should be strictly arranged according to the above plan.",
+    pageWidth - 80
+  );
+  doc.text(noteLines, pageWidth / 2, afterTableY, { align: "center" });
+
+  const sigY = afterTableY + noteLines.length * 12 + 40;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("Signature of Hall Superintendent", 40, sigY);
+  doc.text("Signature of Chief Superintendent", pageWidth - 40, sigY, { align: "right" });
+
+  const fileName = `SeatingPlan_Circular_Room${h.roomNo || ""}.pdf`;
+  doc.save(fileName);
+
+  const blob = doc.output("blob");
+  archiveToFirebase(fileName, blob, { type: "seating-plan-circular-pdf", header: h });
+};
+
+/* =================================================================
+   EXPORT: Consolidated Seating Plan .xlsx / .pdf
+   ================================================================= */
+document.getElementById("exportConsolidatedXlsx").onclick = () => {
+  const c = state.consolidated;
+  const rows = c.rows;
+  const total = rows.reduce((sum, r) => sum + (Number(r.students) || 0), 0);
+
+  const title = [
+    [state.header.institution],
+    [`Date: ${c.circularDate}`],
+    ["CIRCULAR"],
+    [c.examTitle],
+    ["CONSOLIDATED SEATING PLAN"],
+    [`Date of Examinations : ${c.examDate}`],
+    [`Timings: ${c.timings}`],
+    [],
+    ["S.No", "Room No", "No. of Students", "UR Numbers", "Department"],
+  ];
+  const titleRowCount = title.length;
+
+  const body = rows.map((r, i) => [i + 1, r.roomNo, Number(r.students) || 0, r.urNumbers, r.department]);
+  const totalRow = ["", "Total", total, "", ""];
+  const noteRow = [
+    "Note: All students are instructed to be seated in their respective exam hall 10min. before the commencement of exam.",
+    "",
+    "",
+    "",
+    "",
+  ];
+  const sigRow = ["", "", "", "", "Chief Superintendent"];
+
+  const ws = XLSX.utils.aoa_to_sheet([...title, ...body, totalRow, noteRow, [], sigRow]);
+  ws["!merges"] = [0, 2, 3, 4, 5, 6].map((r) => ({ s: { r, c: 0 }, e: { r, c: 4 } }));
+  const noteRowIdx = titleRowCount + rows.length + 1;
+  ws["!merges"].push({ s: { r: noteRowIdx, c: 0 }, e: { r: noteRowIdx, c: 4 } });
+  ws["!cols"] = [{ wch: 8 }, { wch: 12 }, { wch: 16 }, { wch: 50 }, { wch: 20 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Consolidated Seating Plan");
+  const fileName = `Consolidated_SeatingPlan_${c.examDate || ""}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+
+  const blob = new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  archiveToFirebase(fileName, blob, { type: "consolidated-seating", header: c });
+};
+
+document.getElementById("exportConsolidatedPdf").onclick = () => {
+  const c = state.consolidated;
+  const rows = c.rows;
+  const total = rows.reduce((sum, r) => sum + (Number(r.students) || 0), 0);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  const logoW = 90, logoH = 40;
+  doc.addImage(UNIVERSITY_LOGO_BASE64, "PNG", 40, 24, logoW, logoH);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text(`Date: ${c.circularDate}`, pageWidth - 40, 36, { align: "right" });
+
+  doc.setFontSize(13);
+  doc.text("CIRCULAR", pageWidth / 2, 92, { align: "center" });
+  doc.setFontSize(11);
+  doc.text(c.examTitle, pageWidth / 2, 108, { align: "center" });
+  doc.text("CONSOLIDATED SEATING PLAN", pageWidth / 2, 124, { align: "center" });
+  doc.text(`Date of Examinations : ${c.examDate}`, pageWidth / 2, 140, { align: "center" });
+  doc.text(`Timings: ${c.timings}`, pageWidth / 2, 156, { align: "center" });
+
+  const head = [["S.No", "Room No", "No. of Students", "UR Numbers", "Department"]];
+  const body = rows.map((r, i) => [String(i + 1), r.roomNo, String(r.students), r.urNumbers, r.department]);
+  body.push(["", "Total", String(total), "", ""]);
+
+  doc.autoTable({
+    head,
+    body,
+    startY: 172,
+    theme: "grid",
+    styles: { fontSize: 8, halign: "center", cellPadding: 4, overflow: "linebreak" },
+    columnStyles: { 3: { halign: "left", cellWidth: 190 }, 4: { cellWidth: 90 } },
+    headStyles: { fillColor: [239, 232, 216], textColor: [35, 31, 26] },
+    didParseCell: (data) => {
+      if (data.section === "body" && data.row.index === body.length - 1) {
+        data.cell.styles.fontStyle = "bold";
+      }
+    },
+  });
+
+  const afterTableY = doc.lastAutoTable.finalY + 18;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  const noteLines = doc.splitTextToSize(
+    "Note: All students are instructed to be seated in their respective exam hall 10min. before the commencement of exam.",
+    pageWidth - 80
+  );
+  doc.text(noteLines, 40, afterTableY);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("Chief Superintendent", pageWidth - 40, afterTableY + 50, { align: "right" });
+
+  const fileName = `Consolidated_SeatingPlan_${c.examDate || ""}.pdf`;
+  doc.save(fileName);
+
+  const blob = doc.output("blob");
+  archiveToFirebase(fileName, blob, { type: "consolidated-seating-pdf", header: c });
 };
 
 </script>
