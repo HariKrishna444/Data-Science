@@ -61,12 +61,12 @@ h3 { font-size: 13px; letter-spacing: .05em; color: var(--maroon); margin: 0 0 1
 .doc-meta { margin-top: 18px; font-size: 14px; }
 .doc-meta .doc-row { display: flex; justify-content: space-between; margin-top: 4px; }
 .doc-signature { text-align: right; font-weight: bold; margin-top: 48px; font-size: 14px; }
-table.sheet { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 14px; }
-table.sheet th, table.sheet td { border: 1px solid var(--line); padding: 5px 7px; text-align: center; white-space: nowrap; }
-table.sheet th { background: #efe8d8; }
+table.sheet { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 14px; border: 2px solid #000; }
+table.sheet th, table.sheet td { border: 1.5px solid #000; padding: 6px 8px; text-align: center; white-space: nowrap; }
+table.sheet th { background: #efe8d8; border: 1.5px solid #000; }
 table.sheet td.left { text-align: left; }
 table.sheet td.wrap { white-space: normal; }
-table.sheet td.ur-two-col { white-space: normal; text-align: left; column-count: 2; column-gap: 22px; -webkit-column-count: 2; -webkit-column-gap: 22px; }
+.ur-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; row-gap: 2px; text-align: left; }
 table.sheet td.total-label { font-weight: bold; }
 
 .doc-note { margin-top: 14px; font-size: 12px; text-align: center; }
@@ -650,6 +650,19 @@ function renderPreview() {
   }
 }
 
+/* Build a true 2-item-per-row grid for the UR Numbers cell (row-major
+   order), so the printed/on-screen layout always shows exactly two
+   columns regardless of cell width or font size. */
+function urNumbersGridHtml(urString) {
+  if (!urString) return "";
+  const parts = urString.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length <= 1) return escapeHtml(urString);
+  const cells = parts
+    .map((p, i) => `<span>${escapeHtml(p)}${i < parts.length - 1 ? "," : ""}</span>`)
+    .join("");
+  return `<div class="ur-grid">${cells}</div>`;
+}
+
 function renderConsolidatedPreview(body) {
   const c = state.consolidated;
   const rows = c.rows;
@@ -670,7 +683,7 @@ function renderConsolidatedPreview(body) {
   html += `<div class="doc-center-bold">Timings: ${escapeHtml(c.timings)}</div>`;
   html += `<table class="sheet" style="margin-top:16px;width:100%;"><thead><tr><th>S.No</th><th>Room. No</th><th>No. of Students</th><th>UR Numbers</th><th>Department</th></tr></thead><tbody>`;
   rows.forEach((r, i) => {
-    html += `<tr><td>${i + 1}</td><td>${escapeHtml(r.roomNo)}</td><td>${escapeHtml(String(r.students))}</td><td class="left wrap ur-two-col">${escapeHtml(r.urNumbers)}</td><td>${escapeHtml(r.department)}</td></tr>`;
+    html += `<tr><td>${i + 1}</td><td>${escapeHtml(r.roomNo)}</td><td>${escapeHtml(String(r.students))}</td><td class="left wrap">${urNumbersGridHtml(r.urNumbers)}</td><td>${escapeHtml(r.department)}</td></tr>`;
   });
   html += `<tr><td class="total-label" colspan="2">Total</td><td class="total-label">${total}</td><td></td><td></td></tr>`;
   html += `<tr><td colspan="5" class="left wrap">Note: All students are instructed to be seated in their respective exam hall 10min. before the commencement of exam.</td></tr>`;
