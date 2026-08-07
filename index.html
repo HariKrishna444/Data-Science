@@ -71,10 +71,14 @@ table.sheet td.total-label { font-weight: bold; }
 .doc-note { margin-top: 14px; font-size: 12px; text-align: center; }
 .doc-sig-row { display: flex; justify-content: space-between; margin-top: 48px; font-weight: bold; font-size: 14px; }
 
-.doc-header-left { position: relative; text-align: left; padding-top: 4px; border-bottom: 2px solid var(--ink); padding-bottom: 10px; margin-bottom: 12px; }
-.doc-logo-sm { height: 62px; display: block; }
+.doc-header-left { position: relative; text-align: center; padding-top: 4px; border-bottom: 2px solid var(--ink); padding-bottom: 10px; margin-bottom: 12px; }
+.doc-logo-sm { height: 62px; display: block; margin: 0 auto; }
 .doc-circular-title { text-align: center; font-weight: bold; text-decoration: underline; font-size: 15px; margin-top: 12px; }
 .doc-center-bold { text-align: center; font-weight: bold; font-size: 14px; margin-top: 2px; }
+
+/* All generated document text: bold + solid black, for print/photocopy clarity */
+#previewBody, #previewBody * { color: #000 !important; font-weight: bold !important; }
+
 
 .tab.tab-small { padding: 8px 12px; font-size: 12px; }
 
@@ -120,6 +124,11 @@ table.sheet td.total-label { font-weight: bold; }
             <span>Rows per Column (seat block)</span>
             <input id="rowsPerCol" type="number" value="7" min="1" max="20" />
           </label>
+          <label class="field">
+            <span>Total Seats in Room (fixed box count)</span>
+            <input id="totalSeats" type="number" value="35" min="1" max="500" />
+          </label>
+          <div class="hint" style="margin:-4px 0 0;">Seating Plan always shows this many boxes — unfilled ones stay vacant, no matter how many students are uploaded.</div>
         </div>
 
         <div class="card stat">
@@ -291,19 +300,51 @@ const state = {
 };
 
 /* =================================================================
+   UR NUMBERS for the Consolidated Seating Plan row.
+   Regular exams: register numbers run in one unbroken block (e.g.
+   ...0030 to ...0367) — shown compactly as "FIRST TO LAST".
+   Supply exams: register numbers are scattered (e.g. 3, 5, 8, 19) —
+   every register number is listed out in full, comma-separated, so
+   no student is left out of the circular.
+   ================================================================= */
+function computeUrNumbers(students) {
+  if (!students.length) return "";
+  if (students.length === 1) return students[0].register;
+
+  // Pull the trailing numeric run off each register number (the roll
+  // number part) so we can check whether it's a clean +1 sequence.
+  const parsed = students.map((s) => {
+    const m = String(s.register).match(/(\d+)\s*$/);
+    return m ? { prefix: s.register.slice(0, m.index), num: parseInt(m[1], 10), width: m[1].length } : null;
+  });
+
+  const isSequential =
+    parsed.every((p) => p !== null) &&
+    parsed.every((p, i) => i === 0 || (p.prefix === parsed[i - 1].prefix && p.num === parsed[i - 1].num + 1));
+
+  if (isSequential) {
+    return `${students[0].register} TO ${students[students.length - 1].register}`;
+  }
+
+  // Supply / non-sequential exam — list every register number so the
+  // circular reflects exactly who is seated, in the order uploaded.
+  return students.map((s) => s.register).join(", ");
+}
+
+/* =================================================================
    Push the currently uploaded room's data (Room Wise Seating Plan)
    into the Consolidated Seating Plan table — keeps S.No / Room No /
    No. of Students / UR Numbers / Department matched to real input.
+   For regular exams this collapses to "FIRST TO LAST"; for supply
+   exams (non-sequential register numbers) every UR number is listed.
    ================================================================= */
 function syncRoomToConsolidated() {
   if (!state.students.length) return;
   const h = state.header;
-  const first = state.students[0].register;
-  const last = state.students[state.students.length - 1].register;
   const row = {
     roomNo: h.roomNo,
     students: state.students.length,
-    urNumbers: first && last ? `${first} TO ${last}` : "",
+    urNumbers: computeUrNumbers(state.students),
     department: h.branch,
   };
   const idx = state.consolidated.rows.findIndex((r) => r.roomNo === h.roomNo);
@@ -409,6 +450,9 @@ document.getElementById("tabConsolidated").onclick = () => switchTab("consolidat
 document.getElementById("rowsPerCol").addEventListener("input", () => {
   if (state.tab === "seating" || state.tab === "seatingPlan") renderPreview();
 });
+document.getElementById("totalSeats").addEventListener("input", () => {
+  if (state.tab === "seating" || state.tab === "seatingPlan") renderPreview();
+});
 
 function switchTab(tab) {
   state.tab = tab;
@@ -495,7 +539,16 @@ function getRowsPerCol() {
   return Math.max(1, Number(document.getElementById("rowsPerCol").value) || 7);
 }
 
+/* Fixed number of seat boxes to draw for the room — independent of how
+   many students were actually uploaded. Unfilled boxes render as
+   numbered-but-empty ("vacant") seats. Defaults to 35. */
+function getTotalSeats() {
+  const fromField = Number(document.getElementById("totalSeats").value);
+  return Math.max(1, fromField || 35);
+}
+
 function seatTableHtml(rowsPerCol, cols) {
+  const totalSeats = getTotalSeats();
   let html = `<table class="sheet"><thead><tr>`;
   for (let c = 0; c < cols; c++) html += `<th>Seat No</th><th>UR Number</th>`;
   html += `</tr></thead><tbody>`;
@@ -503,9 +556,15 @@ function seatTableHtml(rowsPerCol, cols) {
     html += "<tr>";
     for (let c = 0; c < cols; c++) {
       const seatNo = seatNumberAt(r, c, rowsPerCol);
-      const inRange = seatNo <= state.students.length;
-      const st = inRange ? state.students[seatNo - 1] : null;
-      html += `<td>${inRange ? seatNo : ""}</td><td>${st ? escapeHtml(st.register) : ""}</td>`;
+      const isBox = seatNo <= totalSeats;
+      const st = isBox && seatNo <= state.students.length ? state.students[seatNo - 1] : null;
+      if (!isBox) {
+        html += `<td></td><td></td>`;
+      } else if (st) {
+        html += `<td>${seatNo}</td><td>${escapeHtml(st.register)}</td>`;
+      } else {
+        html += `<td>${seatNo}</td><td>Vacant</td>`;
+      }
     }
     html += "</tr>";
   }
@@ -550,7 +609,7 @@ function renderPreview() {
   if (state.tab === "seating") {
     // Room Wise Seating Plan (original compact template)
     const rowsPerCol = getRowsPerCol();
-    const cols = Math.max(1, Math.ceil(state.students.length / rowsPerCol));
+    const cols = Math.max(1, Math.ceil(getTotalSeats() / rowsPerCol));
     let html = `<div class="doc-header">`;
     html += `<div class="doc-date">Date:${escapeHtml(h.date)}</div>`;
     html += `<img class="doc-logo" src="${UNIVERSITY_LOGO_BASE64}" alt="${escapeHtml(h.institution)} logo" />`;
@@ -572,7 +631,7 @@ function renderPreview() {
     // Seating Plan — matches the official room-slip circular template
     // (logo, YAMNAMPET line, Date of Exam/Room No row, note text, dual signatures)
     const rowsPerCol = getRowsPerCol();
-    const cols = Math.max(1, Math.ceil(state.students.length / rowsPerCol));
+    const cols = Math.max(1, Math.ceil(getTotalSeats() / rowsPerCol));
     let html = `<div class="doc-header">`;
     html += `<img class="doc-logo" src="${UNIVERSITY_LOGO_BASE64}" alt="${escapeHtml(h.institution)} logo" />`;
     html += `<div class="doc-title">${escapeHtml(h.examTitle)}</div>`;
@@ -662,7 +721,8 @@ document.getElementById("exportAttendance").onclick = () => {
 document.getElementById("exportSeatingXlsx").onclick = () => {
   const h = state.header;
   const rowsPerCol = getRowsPerCol();
-  const cols = Math.max(1, Math.ceil(state.students.length / rowsPerCol));
+  const totalSeats = getTotalSeats();
+  const cols = Math.max(1, Math.ceil(totalSeats / rowsPerCol));
 
   const headRow = [];
   for (let c = 0; c < cols; c++) headRow.push("Seat No", "UR Number");
@@ -685,9 +745,10 @@ document.getElementById("exportSeatingXlsx").onclick = () => {
     const line = [];
     for (let c = 0; c < cols; c++) {
       const seatNo = seatNumberAt(r, c, rowsPerCol);
-      const st = state.students[seatNo - 1];
-      if (seatNo <= state.students.length) line.push(seatNo, st ? st.register : "");
-      else line.push("", "");
+      const isBox = seatNo <= totalSeats;
+      const st = isBox && seatNo <= state.students.length ? state.students[seatNo - 1] : null;
+      if (!isBox) line.push("", "");
+      else line.push(seatNo, st ? st.register : "Vacant");
     }
     body.push(line);
   }
@@ -717,7 +778,8 @@ document.getElementById("exportSeatingXlsx").onclick = () => {
 document.getElementById("exportSeatingPdf").onclick = () => {
   const h = state.header;
   const rowsPerCol = getRowsPerCol();
-  const cols = Math.max(1, Math.ceil(state.students.length / rowsPerCol));
+  const totalSeats = getTotalSeats();
+  const cols = Math.max(1, Math.ceil(totalSeats / rowsPerCol));
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
@@ -754,9 +816,10 @@ document.getElementById("exportSeatingPdf").onclick = () => {
     const line = [];
     for (let c = 0; c < cols; c++) {
       const seatNo = seatNumberAt(r, c, rowsPerCol);
-      const st = state.students[seatNo - 1];
-      if (seatNo <= state.students.length) line.push(String(seatNo), st ? st.register : "");
-      else line.push("", "");
+      const isBox = seatNo <= totalSeats;
+      const st = isBox && seatNo <= state.students.length ? state.students[seatNo - 1] : null;
+      if (!isBox) line.push("", "");
+      else line.push(String(seatNo), st ? st.register : "Vacant");
     }
     body.push(line);
   }
@@ -766,8 +829,8 @@ document.getElementById("exportSeatingPdf").onclick = () => {
     body,
     startY: 190,
     theme: "grid",
-    styles: { fontSize: 8, halign: "center", cellPadding: 4 },
-    headStyles: { fillColor: [239, 232, 216], textColor: [35, 31, 26] },
+    styles: { fontSize: 8, halign: "center", cellPadding: 4, fontStyle: "bold", textColor: [0, 0, 0] },
+    headStyles: { fillColor: [239, 232, 216], textColor: [0, 0, 0], fontStyle: "bold" },
   });
 
   const afterTableY = doc.lastAutoTable.finalY + 50;
@@ -788,7 +851,8 @@ document.getElementById("exportSeatingPdf").onclick = () => {
 document.getElementById("exportSeatingPlanXlsx").onclick = () => {
   const h = state.header;
   const rowsPerCol = getRowsPerCol();
-  const cols = Math.max(1, Math.ceil(state.students.length / rowsPerCol));
+  const totalSeats = getTotalSeats();
+  const cols = Math.max(1, Math.ceil(totalSeats / rowsPerCol));
 
   const headRow = [];
   for (let c = 0; c < cols; c++) headRow.push("Seat No", "UR Number");
@@ -811,9 +875,10 @@ document.getElementById("exportSeatingPlanXlsx").onclick = () => {
     const line = [];
     for (let c = 0; c < cols; c++) {
       const seatNo = seatNumberAt(r, c, rowsPerCol);
-      const st = state.students[seatNo - 1];
-      if (seatNo <= state.students.length) line.push(seatNo, st ? st.register : "");
-      else line.push("", "");
+      const isBox = seatNo <= totalSeats;
+      const st = isBox && seatNo <= state.students.length ? state.students[seatNo - 1] : null;
+      if (!isBox) line.push("", "");
+      else line.push(seatNo, st ? st.register : "Vacant");
     }
     body.push(line);
   }
@@ -844,7 +909,8 @@ document.getElementById("exportSeatingPlanXlsx").onclick = () => {
 document.getElementById("exportSeatingPlanPdf").onclick = () => {
   const h = state.header;
   const rowsPerCol = getRowsPerCol();
-  const cols = Math.max(1, Math.ceil(state.students.length / rowsPerCol));
+  const totalSeats = getTotalSeats();
+  const cols = Math.max(1, Math.ceil(totalSeats / rowsPerCol));
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
@@ -873,9 +939,10 @@ document.getElementById("exportSeatingPlanPdf").onclick = () => {
     const line = [];
     for (let c = 0; c < cols; c++) {
       const seatNo = seatNumberAt(r, c, rowsPerCol);
-      const st = state.students[seatNo - 1];
-      if (seatNo <= state.students.length) line.push(String(seatNo), st ? st.register : "");
-      else line.push("", "");
+      const isBox = seatNo <= totalSeats;
+      const st = isBox && seatNo <= state.students.length ? state.students[seatNo - 1] : null;
+      if (!isBox) line.push("", "");
+      else line.push(String(seatNo), st ? st.register : "Vacant");
     }
     body.push(line);
   }
@@ -885,8 +952,8 @@ document.getElementById("exportSeatingPlanPdf").onclick = () => {
     body,
     startY: 162,
     theme: "grid",
-    styles: { fontSize: 8, halign: "center", cellPadding: 4 },
-    headStyles: { fillColor: [239, 232, 216], textColor: [35, 31, 26] },
+    styles: { fontSize: 8, halign: "center", cellPadding: 4, fontStyle: "bold", textColor: [0, 0, 0] },
+    headStyles: { fillColor: [239, 232, 216], textColor: [0, 0, 0], fontStyle: "bold" },
   });
 
   const afterTableY = doc.lastAutoTable.finalY + 24;
@@ -992,9 +1059,9 @@ document.getElementById("exportConsolidatedPdf").onclick = () => {
     body,
     startY: 172,
     theme: "grid",
-    styles: { fontSize: 8, halign: "center", cellPadding: 4, overflow: "linebreak" },
+    styles: { fontSize: 8, halign: "center", cellPadding: 4, overflow: "linebreak", fontStyle: "bold", textColor: [0, 0, 0] },
     columnStyles: { 3: { halign: "left", cellWidth: 190 }, 4: { cellWidth: 90 } },
-    headStyles: { fillColor: [239, 232, 216], textColor: [35, 31, 26] },
+    headStyles: { fillColor: [239, 232, 216], textColor: [0, 0, 0], fontStyle: "bold" },
     didParseCell: (data) => {
       if (data.section === "body" && data.row.index === body.length - 1) {
         data.cell.styles.fontStyle = "bold";
