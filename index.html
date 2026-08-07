@@ -66,6 +66,7 @@ table.sheet th, table.sheet td { border: 1px solid var(--line); padding: 5px 7px
 table.sheet th { background: #efe8d8; }
 table.sheet td.left { text-align: left; }
 table.sheet td.wrap { white-space: normal; }
+table.sheet td.ur-two-col { white-space: normal; text-align: left; column-count: 2; column-gap: 22px; -webkit-column-count: 2; -webkit-column-gap: 22px; }
 table.sheet td.total-label { font-weight: bold; }
 
 .doc-note { margin-top: 14px; font-size: 12px; text-align: center; }
@@ -563,7 +564,7 @@ function seatTableHtml(rowsPerCol, cols) {
       } else if (st) {
         html += `<td>${seatNo}</td><td>${escapeHtml(st.register)}</td>`;
       } else {
-        html += `<td>${seatNo}</td><td>Vacant</td>`;
+        html += `<td>${seatNo}</td><td></td>`;
       }
     }
     html += "</tr>";
@@ -669,7 +670,7 @@ function renderConsolidatedPreview(body) {
   html += `<div class="doc-center-bold">Timings: ${escapeHtml(c.timings)}</div>`;
   html += `<table class="sheet" style="margin-top:16px;width:100%;"><thead><tr><th>S.No</th><th>Room. No</th><th>No. of Students</th><th>UR Numbers</th><th>Department</th></tr></thead><tbody>`;
   rows.forEach((r, i) => {
-    html += `<tr><td>${i + 1}</td><td>${escapeHtml(r.roomNo)}</td><td>${escapeHtml(String(r.students))}</td><td class="left wrap">${escapeHtml(r.urNumbers)}</td><td>${escapeHtml(r.department)}</td></tr>`;
+    html += `<tr><td>${i + 1}</td><td>${escapeHtml(r.roomNo)}</td><td>${escapeHtml(String(r.students))}</td><td class="left wrap ur-two-col">${escapeHtml(r.urNumbers)}</td><td>${escapeHtml(r.department)}</td></tr>`;
   });
   html += `<tr><td class="total-label" colspan="2">Total</td><td class="total-label">${total}</td><td></td><td></td></tr>`;
   html += `<tr><td colspan="5" class="left wrap">Note: All students are instructed to be seated in their respective exam hall 10min. before the commencement of exam.</td></tr>`;
@@ -748,7 +749,7 @@ document.getElementById("exportSeatingXlsx").onclick = () => {
       const isBox = seatNo <= totalSeats;
       const st = isBox && seatNo <= state.students.length ? state.students[seatNo - 1] : null;
       if (!isBox) line.push("", "");
-      else line.push(seatNo, st ? st.register : "Vacant");
+      else line.push(seatNo, st ? st.register : "");
     }
     body.push(line);
   }
@@ -819,7 +820,7 @@ document.getElementById("exportSeatingPdf").onclick = () => {
       const isBox = seatNo <= totalSeats;
       const st = isBox && seatNo <= state.students.length ? state.students[seatNo - 1] : null;
       if (!isBox) line.push("", "");
-      else line.push(String(seatNo), st ? st.register : "Vacant");
+      else line.push(String(seatNo), st ? st.register : "");
     }
     body.push(line);
   }
@@ -878,7 +879,7 @@ document.getElementById("exportSeatingPlanXlsx").onclick = () => {
       const isBox = seatNo <= totalSeats;
       const st = isBox && seatNo <= state.students.length ? state.students[seatNo - 1] : null;
       if (!isBox) line.push("", "");
-      else line.push(seatNo, st ? st.register : "Vacant");
+      else line.push(seatNo, st ? st.register : "");
     }
     body.push(line);
   }
@@ -942,7 +943,7 @@ document.getElementById("exportSeatingPlanPdf").onclick = () => {
       const isBox = seatNo <= totalSeats;
       const st = isBox && seatNo <= state.students.length ? state.students[seatNo - 1] : null;
       if (!isBox) line.push("", "");
-      else line.push(String(seatNo), st ? st.register : "Vacant");
+      else line.push(String(seatNo), st ? st.register : "");
     }
     body.push(line);
   }
@@ -981,6 +982,19 @@ document.getElementById("exportSeatingPlanPdf").onclick = () => {
 /* =================================================================
    EXPORT: Consolidated Seating Plan .xlsx / .pdf
    ================================================================= */
+/* Two-column text version of a UR Numbers string, for PDF/Excel exports
+   where CSS columns aren't available — breaks the line every 2 register
+   numbers so it prints the same way it looks on screen. */
+function urNumbersTwoColumnText(urString) {
+  if (!urString) return "";
+  const parts = urString.split(",").map((p) => p.trim()).filter(Boolean);
+  const lines = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    lines.push(parts.slice(i, i + 2).join(", "));
+  }
+  return lines.join("\n");
+}
+
 document.getElementById("exportConsolidatedXlsx").onclick = () => {
   const c = state.consolidated;
   const rows = c.rows;
@@ -999,7 +1013,7 @@ document.getElementById("exportConsolidatedXlsx").onclick = () => {
   ];
   const titleRowCount = title.length;
 
-  const body = rows.map((r, i) => [i + 1, r.roomNo, Number(r.students) || 0, r.urNumbers, r.department]);
+  const body = rows.map((r, i) => [i + 1, r.roomNo, Number(r.students) || 0, urNumbersTwoColumnText(r.urNumbers), r.department]);
   const totalRow = ["", "Total", total, "", ""];
   const noteRow = [
     "Note: All students are instructed to be seated in their respective exam hall 10min. before the commencement of exam.",
@@ -1051,7 +1065,7 @@ document.getElementById("exportConsolidatedPdf").onclick = () => {
   doc.text(`Timings: ${c.timings}`, pageWidth / 2, 156, { align: "center" });
 
   const head = [["S.No", "Room No", "No. of Students", "UR Numbers", "Department"]];
-  const body = rows.map((r, i) => [String(i + 1), r.roomNo, String(r.students), r.urNumbers, r.department]);
+  const body = rows.map((r, i) => [String(i + 1), r.roomNo, String(r.students), urNumbersTwoColumnText(r.urNumbers), r.department]);
   body.push(["", "Total", String(total), "", ""]);
 
   doc.autoTable({
