@@ -1064,7 +1064,7 @@ document.getElementById("exportConsolidatedPdf").onclick = () => {
   const pageWidth = doc.internal.pageSize.getWidth();
 
   const logoW = 90, logoH = 40;
-  doc.addImage(UNIVERSITY_LOGO_BASE64, "PNG", 40, 24, logoW, logoH);
+  doc.addImage(UNIVERSITY_LOGO_BASE64, "PNG", pageWidth / 2 - logoW / 2, 24, logoW, logoH);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
