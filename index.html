@@ -62,7 +62,7 @@ h3 { font-size: 13px; letter-spacing: .05em; color: var(--maroon); margin: 0 0 1
 .doc-meta .doc-row { display: flex; justify-content: space-between; margin-top: 4px; }
 .doc-signature { text-align: right; font-weight: bold; margin-top: 48px; font-size: 14px; }
 table.sheet { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 14px; border: 3px solid #000; }
-table.sheet th, table.sheet td { border: 2px solid #000; padding: 6px 8px; text-align: center; vertical-align: middle; white-space: nowrap; }
+table.sheet th, table.sheet td { border: 2px solid #000; padding: 16px 8px; text-align: center; vertical-align: middle; white-space: nowrap; }
 table.sheet th { background: #efe8d8; border: 2px solid #000; }
 table.sheet td.left { text-align: left; }
 table.sheet td.wrap { white-space: normal; }
@@ -97,6 +97,20 @@ table.sheet td.total-label { font-weight: bold; }
   #previewBody, #previewBody * { visibility: visible; }
   #previewBody { position: absolute; top: 0; left: 0; width: 100%; box-shadow: none; }
   .topbar, .panel, .tabs { display: none !important; }
+
+  /* Keep table borders/column lines solid black and header shading visible
+     when printing or saving to PDF (browsers often strip colors by default). */
+  table.sheet,
+  table.sheet th,
+  table.sheet td {
+    border-color: #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  table.sheet th {
+    background: #efe8d8 !important;
+  }
 }
 
 </style>
@@ -641,6 +655,7 @@ function renderPreview() {
     html += `<div class="doc-row"><span><b>Branch:</b> ${escapeHtml(h.branch)}</span><span><b>Time:</b> ${escapeHtml(h.time)}</span></div>`;
     html += `<div><b>Course Code &amp; Title :</b> ${escapeHtml(h.courseCode)}</div>`;
     html += `</div>`;
+    html += `<div class="doc-title" style="font-family:'Times New Roman', Times, serif; font-size:28px; margin:14px 0 8px;">SEATING PLAN</div>`;
     html += seatTableHtml(rowsPerCol, cols);
     html += `<div class="doc-note">Cross the box containing the hall ticket number with red pen when the candidate is absent. Seating should be strictly arranged according to the above plan.</div>`;
     html += `<div class="doc-sig-row"><span>Signature of Hall Superintendent</span><span>Signature of Chief Superintendent</span></div>`;
