@@ -215,6 +215,7 @@ table.sheet td.total-label { font-weight: bold; }
   <!-- Document / spreadsheet / PDF libraries (all client-side, no backend needed) -->
   <script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
@@ -891,30 +892,74 @@ document.getElementById("exportSeatingPdf").onclick = () => {
 /* =================================================================
    EXPORT: Seating Plan (circular template) .xlsx / .pdf
    ================================================================= */
-document.getElementById("exportSeatingPlanXlsx").onclick = () => {
+/* Trigger a browser download for a Blob (used by ExcelJS-based exports,
+   which don't have XLSX.writeFile's built-in save helper). */
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* Thin solid black border, reused on every styled xlsx cell so the sheet
+   matches the bordered look of the printed / PDF seating plan. */
+const XLSX_BLACK_BORDER = {
+  top: { style: "thin", color: { argb: "FF000000" } },
+  left: { style: "thin", color: { argb: "FF000000" } },
+  bottom: { style: "thin", color: { argb: "FF000000" } },
+  right: { style: "thin", color: { argb: "FF000000" } },
+};
+
+document.getElementById("exportSeatingPlanXlsx").onclick = async () => {
   const h = state.header;
   const rowsPerCol = getRowsPerCol();
   const totalSeats = getTotalSeats();
   const cols = Math.max(1, Math.ceil(totalSeats / rowsPerCol));
+  const colCount = cols * 2;
+  const lastCol = colCount; // 1-indexed last column for ExcelJS
 
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Seating Plan", {
+    pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 },
+    views: [{ showGridLines: false }],
+  });
+  ws.columns = Array(colCount).fill({ width: 15 });
+
+  const addMergedText = (text, opts = {}) => {
+    const row = ws.addRow([]);
+    ws.mergeCells(row.number, 1, row.number, lastCol);
+    const cell = row.getCell(1);
+    cell.value = text;
+    cell.font = { bold: true, size: opts.size || 11, name: opts.font || "Calibri" };
+    cell.alignment = { horizontal: opts.align || "center", vertical: "middle" };
+    return row;
+  };
+
+  addMergedText(h.institution, { size: 14 });
+  addMergedText("YAMNAMPET, GHATKESAR", { size: 10 });
+  addMergedText(h.examTitle, { size: 13 });
+  addMergedText(`Date of Exam: ${h.date}        Room No: ${h.roomNo}`, { align: "left" });
+  addMergedText(`Branch: ${h.branch}        Time: ${h.time}`, { align: "left" });
+  addMergedText(`Course Code & Title : ${h.courseCode}`, { align: "left" });
+  addMergedText("SEATING PLAN", { size: 13, font: "Times New Roman" });
+  ws.addRow([]);
+
+  // Table header row (Seat No / UR Number ...)
   const headRow = [];
   for (let c = 0; c < cols; c++) headRow.push("Seat No", "UR Number");
-  const lastCol = headRow.length - 1;
+  const headerRow = ws.addRow(headRow);
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = XLSX_BLACK_BORDER;
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFE8D8" } };
+  });
 
-  const title = [
-    [h.institution],
-    ["YAMNAMPET, GHATKESAR"],
-    [h.examTitle],
-    [`Date of Exam: ${h.date}        Room No: ${h.roomNo}`],
-    [`Branch: ${h.branch}        Time: ${h.time}`],
-    [`Course Code & Title : ${h.courseCode}`],
-    ["SEATING PLAN"],
-    [],
-    headRow,
-  ];
-  const titleRowCount = title.length;
-
-  const body = [];
+  // Table body
   for (let r = 0; r < rowsPerCol; r++) {
     const line = [];
     for (let c = 0; c < cols; c++) {
@@ -924,29 +969,36 @@ document.getElementById("exportSeatingPlanXlsx").onclick = () => {
       if (!isBox) line.push("", "");
       else line.push(seatNo, st ? st.register : "");
     }
-    body.push(line);
+    const bodyRow = ws.addRow(line);
+    bodyRow.eachCell({ includeEmpty: true }, (cell) => {
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = XLSX_BLACK_BORDER;
+    });
   }
 
-  const noteRow = Array(headRow.length).fill("");
-  noteRow[0] =
-    "Cross the box containing the hall ticket number with red pen when the candidate is absent. Seating should be strictly arranged according to the above plan.";
-  const sigRow = Array(headRow.length).fill("");
-  sigRow[0] = "Signature of Hall Superintendent";
-  sigRow[lastCol] = "Signature of Chief Superintendent";
+  ws.addRow([]);
+  addMergedText(
+    "Cross the box containing the hall ticket number with red pen when the candidate is absent. Seating should be strictly arranged according to the above plan.",
+    { size: 10 }
+  );
+  ws.addRow([]);
 
-  const ws = XLSX.utils.aoa_to_sheet([...title, ...body, [], noteRow, [], sigRow]);
-  ws["!merges"] = [0, 1, 2, 3, 4, 5, 6].map((r) => ({ s: { r, c: 0 }, e: { r, c: lastCol } }));
-  const noteRowIdx = titleRowCount + rowsPerCol + 1;
-  ws["!merges"].push({ s: { r: noteRowIdx, c: 0 }, e: { r: noteRowIdx, c: lastCol } });
-  ws["!cols"] = Array(headRow.length).fill({ wch: 14 });
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Seating Plan");
+  const sigRow = ws.addRow([]);
+  sigRow.getCell(1).value = "Signature of Hall Superintendent";
+  sigRow.getCell(1).font = { bold: true };
+  ws.mergeCells(sigRow.number, lastCol - 1, sigRow.number, lastCol);
+  const sigRight = sigRow.getCell(lastCol - 1);
+  sigRight.value = "Signature of Chief Superintendent";
+  sigRight.font = { bold: true };
+  sigRight.alignment = { horizontal: "right" };
+
   const fileName = `SeatingPlan_Circular_Room${h.roomNo || ""}.xlsx`;
-  XLSX.writeFile(wb, fileName);
-
-  const blob = new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], {
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
+  downloadBlob(blob, fileName);
   archiveToFirebase(fileName, blob, { type: "seating-plan-circular", header: h });
 };
 
@@ -1044,48 +1096,77 @@ function urNumbersTwoColumnText(urString) {
   return lines.join("\n");
 }
 
-document.getElementById("exportConsolidatedXlsx").onclick = () => {
+document.getElementById("exportConsolidatedXlsx").onclick = async () => {
   const c = state.consolidated;
   const rows = c.rows;
   const total = rows.reduce((sum, r) => sum + (Number(r.students) || 0), 0);
 
-  const title = [
-    [state.header.institution],
-    [`Date: ${c.circularDate}`],
-    ["CIRCULAR"],
-    [c.examTitle],
-    ["CONSOLIDATED SEATING PLAN"],
-    [`Date of Examinations : ${c.examDate}`],
-    [`Timings: ${c.timings}`],
-    [],
-    ["S.No", "Room No", "No. of Students", "UR Numbers", "Department"],
-  ];
-  const titleRowCount = title.length;
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Consolidated Seating Plan", {
+    pageSetup: { orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 },
+    views: [{ showGridLines: false }],
+  });
+  ws.columns = [{ width: 8 }, { width: 12 }, { width: 16 }, { width: 50 }, { width: 20 }];
 
-  const body = rows.map((r, i) => [i + 1, r.roomNo, Number(r.students) || 0, urNumbersTwoColumnText(r.urNumbers), r.department]);
-  const totalRow = ["", "Total", total, "", ""];
-  const noteRow = [
+  const addMergedText = (text, opts = {}) => {
+    const row = ws.addRow([]);
+    ws.mergeCells(row.number, 1, row.number, 5);
+    const cell = row.getCell(1);
+    cell.value = text;
+    cell.font = { bold: true, size: opts.size || 11, underline: !!opts.underline };
+    cell.alignment = { horizontal: opts.align || "center", vertical: "middle" };
+    return row;
+  };
+
+  addMergedText(state.header.institution, { size: 14 });
+  addMergedText(`Date: ${c.circularDate}`, { align: "left" });
+  addMergedText("CIRCULAR", { size: 12, underline: true });
+  addMergedText(c.examTitle);
+  addMergedText("CONSOLIDATED SEATING PLAN");
+  addMergedText(`Date of Examinations : ${c.examDate}`);
+  addMergedText(`Timings: ${c.timings}`);
+
+  const headerRow = ws.addRow(["S.No", "Room No", "No. of Students", "UR Numbers", "Department"]);
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = XLSX_BLACK_BORDER;
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFE8D8" } };
+  });
+
+  rows.forEach((r, i) => {
+    const bodyRow = ws.addRow([i + 1, r.roomNo, Number(r.students) || 0, urNumbersTwoColumnText(r.urNumbers), r.department]);
+    bodyRow.eachCell({ includeEmpty: true }, (cell) => {
+      cell.font = { bold: true };
+      cell.border = XLSX_BLACK_BORDER;
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+    });
+    bodyRow.getCell(4).alignment = { horizontal: "left", vertical: "middle", wrapText: true };
+  });
+
+  const totalRow = ws.addRow(["", "Total", total, "", ""]);
+  totalRow.eachCell({ includeEmpty: true }, (cell) => {
+    cell.font = { bold: true };
+    cell.border = XLSX_BLACK_BORDER;
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+  });
+
+  addMergedText(
     "Note: All students are instructed to be seated in their respective exam hall 10min. before the commencement of exam.",
-    "",
-    "",
-    "",
-    "",
-  ];
-  const sigRow = ["", "", "", "", "Chief Superintendent"];
+    { align: "left", size: 10 }
+  );
+  ws.addRow([]);
 
-  const ws = XLSX.utils.aoa_to_sheet([...title, ...body, totalRow, noteRow, [], sigRow]);
-  ws["!merges"] = [0, 2, 3, 4, 5, 6].map((r) => ({ s: { r, c: 0 }, e: { r, c: 4 } }));
-  const noteRowIdx = titleRowCount + rows.length + 1;
-  ws["!merges"].push({ s: { r: noteRowIdx, c: 0 }, e: { r: noteRowIdx, c: 4 } });
-  ws["!cols"] = [{ wch: 8 }, { wch: 12 }, { wch: 16 }, { wch: 50 }, { wch: 20 }];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Consolidated Seating Plan");
+  const sigRow = ws.addRow(["", "", "", "", "Chief Superintendent"]);
+  sigRow.getCell(5).font = { bold: true };
+  sigRow.getCell(5).alignment = { horizontal: "right" };
+
   const fileName = `Consolidated_SeatingPlan_${c.examDate || ""}.xlsx`;
-  XLSX.writeFile(wb, fileName);
-
-  const blob = new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], {
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
+  downloadBlob(blob, fileName);
   archiveToFirebase(fileName, blob, { type: "consolidated-seating", header: c });
 };
 
